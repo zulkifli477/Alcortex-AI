@@ -6,8 +6,9 @@ export const analyzePatientData = async (
   language: Language = Language.EN,
   imageUri?: string
 ): Promise<DiagnosisOutput> => {
-  // STRICT COMPLIANCE: Use process.env.API_KEY directly
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+  // Fix: Initialize GoogleGenAI directly with process.env.API_KEY per SDK guidelines.
+  // Assume API_KEY is pre-configured and accessible.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const modelName = "gemini-3-pro-preview";
   
   const labDataString = `
@@ -29,7 +30,6 @@ export const analyzePatientData = async (
   const prompt = `
     Perform a professional clinical diagnosis for the following patient data.
     IMPORTANT: You must provide the entire response in ${language}. 
-    Translate all medical terms, descriptions, and recommendations into ${language}.
     
     Name: ${patient.name}
     Age: ${patient.age}
@@ -41,17 +41,9 @@ export const analyzePatientData = async (
     Lifestyle: Smoking: ${patient.smoking}, Alcohol: ${patient.alcohol}, Activity: ${patient.activity}
     Vital Signs: ${vitalsString}
     Laboratory Data: ${labDataString}
-    ${imageUri ? "An imaging scan (X-ray/CT) is also provided for visual analysis." : ""}
+    ${imageUri ? "An imaging scan is also provided for visual analysis." : ""}
 
-    Provide:
-    1. Main Diagnosis
-    2. 3 Differentials with ICD-10 codes
-    3. Severity (Mild/Moderate/Severe/Critical)
-    4. Confidence Score (0-1)
-    5. Detailed clinical interpretation of findings
-    6. Safety warnings/contraindications
-    7. Clear follow-up recommendations
-    8. Recommended medications/interventions
+    Provide the output in JSON format with specific keys: mainDiagnosis, differentials (array of {diagnosis, icd10, confidence}), severity, confidenceScore, interpretation, safetyWarning, followUp, medicationRecs.
   `;
 
   try {
@@ -100,14 +92,12 @@ export const analyzePatientData = async (
       }
     });
 
+    // Fix: Directly access the .text property (not a method) from GenerateContentResponse
     const text = response.text;
-    if (!text) {
-      throw new Error("EMPTY_RESPONSE: The AI model returned an empty response.");
-    }
-
+    if (!text) throw new Error("Gagal mendapatkan respon dari AI.");
     return JSON.parse(text);
   } catch (error: any) {
-    console.error("Gemini AI Analysis Error:", error);
+    console.error("Gemini AI Error:", error);
     throw error;
   }
 };

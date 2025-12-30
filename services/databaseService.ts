@@ -1,36 +1,23 @@
 
 import { User, SavedRecord } from '../types';
 
-const getBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    const { hostname } = window.location;
-    // Handle GitHub Codespaces forwarded ports logic
-    if (hostname.includes('github.dev') || hostname.includes('preview.app.github.dev')) {
-      const parts = hostname.split('-');
-      // Replace the frontend port (3000 or similar) with backend port 5000
-      const baseUrl = hostname.replace(/-\d+\.app\.github\.dev/, '-5000.app.github.dev');
-      return `https://${baseUrl}/api`;
-    }
-  }
-  return 'http://localhost:5000/api';
-};
-
-const API_BASE_URL = getBaseUrl();
-
+/**
+ * databaseService handles all data persistence.
+ * In this standalone version, it uses localStorage to ensure
+ * the app works immediately on any static hosting (like Netlify).
+ */
 export const databaseService = {
+  // --- USER MANAGEMENT ---
   async registerUser(user: User): Promise<void> {
     try {
-      await fetch(`${API_BASE_URL}/users/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(user),
-      });
-    } catch (error) {
       const users = this.getUsersLocal();
-      if (!users.find(u => u.email === user.email)) {
+      const exists = users.find(u => u.email === user.email);
+      if (!exists) {
         users.push(user);
         localStorage.setItem('alcortex_db_users', JSON.stringify(users));
       }
+    } catch (error) {
+      console.error("Storage error:", error);
     }
   },
 
@@ -38,55 +25,47 @@ export const databaseService = {
     try {
       const data = localStorage.getItem('alcortex_db_users');
       return data ? JSON.parse(data) : [];
-    } catch (e) { return []; }
+    } catch (e) { 
+      return []; 
+    }
   },
 
+  // --- ACTIVITY LOGS ---
   async logActivity(email: string, action: string): Promise<void> {
     try {
-      fetch(`${API_BASE_URL}/activity`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, action })
-      }).catch(() => {});
+      const logs = JSON.parse(localStorage.getItem('alcortex_logs') || '[]');
+      logs.push({ email, action, timestamp: new Date().toISOString() });
+      // Keep only last 50 logs to save space
+      localStorage.setItem('alcortex_logs', JSON.stringify(logs.slice(-50)));
     } catch (error) {}
   },
 
+  // --- RECORD MANAGEMENT (EMR) ---
   async saveDiagnosis(userEmail: string, record: SavedRecord): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/records`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userEmail,
-          recordId: record.id,
-          patientName: record.patient.name,
-          rmNo: record.patient.rmNo,
-          patientData: record.patient,
-          analysisResult: record.analysis
-        })
-      });
-      if (!response.ok) throw new Error();
-    } catch (error) {
       const records = this.getRecordsLocal();
-      records.unshift(record);
-      localStorage.setItem('alcortex_emr_vault', JSON.stringify(records));
+      // Prevent duplicates
+      const filtered = records.filter(r => r.id !== record.id);
+      filtered.unshift(record);
+      localStorage.setItem('alcortex_emr_vault', JSON.stringify(filtered));
+    } catch (error) {
+      console.error("Failed to save record locally:", error);
     }
   },
 
   async getRecords(): Promise<SavedRecord[]> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/records`);
-      if (response.ok) return await response.json();
-      return this.getRecordsLocal();
-    } catch (error) {
-      return this.getRecordsLocal();
-    }
+    // Returns data directly from local storage
+    return this.getRecordsLocal();
   },
 
   getRecordsLocal(): SavedRecord[] {
     try {
       const data = localStorage.getItem('alcortex_emr_vault');
-      return data ? JSON.parse(data) : [];
-    } catch (e) { return []; }
+      if (!data) return [];
+      const parsed = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) { 
+      return []; 
+    }
   }
 };

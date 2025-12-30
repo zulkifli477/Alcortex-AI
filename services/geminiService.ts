@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { PatientData, DiagnosisOutput, Language } from "../types";
 
@@ -6,9 +7,14 @@ export const analyzePatientData = async (
   language: Language = Language.EN,
   imageUri?: string
 ): Promise<DiagnosisOutput> => {
-  // Always initialize GoogleGenAI inside the function to use the most current API key
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const model = "gemini-3-pro-preview";
+  const apiKey = process.env.API_KEY;
+  
+  if (!apiKey) {
+    throw new Error("API_KEY_MISSING: Google Gemini API Key is not configured in the environment.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  const modelName = "gemini-3-pro-preview";
   
   const labDataString = `
     Blood: ${JSON.stringify(patient.labBlood)}
@@ -54,51 +60,60 @@ export const analyzePatientData = async (
     8. Recommended medications/interventions
   `;
 
-  const parts: any[] = [{ text: prompt }];
-  
-  if (imageUri) {
-    const base64Data = imageUri.split(',')[1];
-    parts.push({
-      inlineData: {
-        data: base64Data,
-        mimeType: "image/jpeg"
+  try {
+    const parts: any[] = [{ text: prompt }];
+    
+    if (imageUri) {
+      const base64Data = imageUri.split(',')[1];
+      parts.push({
+        inlineData: {
+          data: base64Data,
+          mimeType: "image/jpeg"
+        }
+      });
+    }
+
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: { parts },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            mainDiagnosis: { type: Type.STRING },
+            differentials: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  diagnosis: { type: Type.STRING },
+                  icd10: { type: Type.STRING },
+                  confidence: { type: Type.NUMBER }
+                },
+                required: ["diagnosis", "icd10", "confidence"]
+              }
+            },
+            severity: { type: Type.STRING },
+            confidenceScore: { type: Type.NUMBER },
+            interpretation: { type: Type.STRING },
+            safetyWarning: { type: Type.STRING },
+            followUp: { type: Type.STRING },
+            medicationRecs: { type: Type.STRING }
+          },
+          required: ["mainDiagnosis", "differentials", "severity", "confidenceScore", "interpretation", "safetyWarning", "followUp", "medicationRecs"]
+        }
       }
     });
-  }
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: { parts },
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          mainDiagnosis: { type: Type.STRING },
-          differentials: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                diagnosis: { type: Type.STRING },
-                icd10: { type: Type.STRING },
-                confidence: { type: Type.NUMBER }
-              },
-              required: ["diagnosis", "icd10", "confidence"]
-            }
-          },
-          severity: { type: Type.STRING },
-          confidenceScore: { type: Type.NUMBER },
-          interpretation: { type: Type.STRING },
-          safetyWarning: { type: Type.STRING },
-          followUp: { type: Type.STRING },
-          medicationRecs: { type: Type.STRING }
-        },
-        required: ["mainDiagnosis", "differentials", "severity", "confidenceScore", "interpretation", "safetyWarning", "followUp", "medicationRecs"]
-      }
+    const text = response.text;
+    if (!text) {
+      throw new Error("EMPTY_RESPONSE: The AI model returned an empty response.");
     }
-  });
 
-  const jsonStr = response.text || '{}';
-  return JSON.parse(jsonStr);
+    return JSON.parse(text);
+  } catch (error: any) {
+    console.error("Gemini AI Analysis Error:", error);
+    throw error;
+  }
 };

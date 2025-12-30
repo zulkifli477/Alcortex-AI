@@ -5,7 +5,9 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
-    'process.env': process.env
+    // Stringify the API_KEY so it's treated as a constant string in the client bundle
+    'process.env.API_KEY': JSON.stringify(process.env.API_KEY),
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
   },
   server: {
     port: 3000,

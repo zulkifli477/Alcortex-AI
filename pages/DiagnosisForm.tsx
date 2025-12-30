@@ -23,7 +23,8 @@ import {
   Droplets,
   Scale,
   MoveVertical,
-  Save
+  Save,
+  XCircle
 } from 'lucide-react';
 import LabInput from '../components/LabInput';
 import { PatientData, DiagnosisOutput, LabResult, User, SavedRecord } from '../types';
@@ -40,6 +41,7 @@ interface DiagnosisFormProps {
 
 const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DiagnosisOutput | null>(null);
   const [step, setStep] = useState(1);
   const [isDraftSaved, setIsDraftSaved] = useState(false);
@@ -84,24 +86,20 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
     ]
   });
 
-  // Load draft from localStorage on mount
   useEffect(() => {
     const draft = localStorage.getItem('alcortex_patient_draft');
     if (draft) {
       try {
         const parsedDraft = JSON.parse(draft);
         setPatient(parsedDraft);
-        // If there was a draft, jump to the last active step if possible or just stay at 1
       } catch (e) {
         console.error("Failed to load patient draft", e);
       }
     }
   }, []);
 
-  // Auto-save draft whenever patient data changes
   useEffect(() => {
     const saveTimeout = setTimeout(() => {
-      // Don't save empty drafts
       if (patient.name || patient.complaints || patient.history || patient.rmNo) {
         localStorage.setItem('alcortex_patient_draft', JSON.stringify(patient));
         setIsDraftSaved(true);
@@ -128,12 +126,12 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
 
   const handleAnalyze = async () => {
     setLoading(true);
+    setError(null);
     setResult(null);
     try {
       const analysis = await analyzePatientData(patient, user.language);
       setResult(analysis);
       
-      // Save to Database Layer
       await onSaveRecord({
         id: 'REC-' + Date.now(),
         date: new Date().toISOString(),
@@ -141,12 +139,19 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
         analysis
       });
 
-      // Clear draft on successful analysis
       localStorage.removeItem('alcortex_patient_draft');
       setStep(4);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Analysis failed. Please try again.");
+      let errorMessage = "Analysis failed. ";
+      if (err.message?.includes("API_KEY_MISSING")) {
+        errorMessage += "API Key is not configured. Please check environment variables.";
+      } else if (err.message?.includes("fetch")) {
+        errorMessage += "Network error. Please check your internet connection.";
+      } else {
+        errorMessage += err.message || "An unexpected error occurred.";
+      }
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -603,6 +608,14 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                     </div>
                     <h3 className="text-4xl font-black tracking-tight">{t.intelligence} Core</h3>
                     <p className="text-slate-300 font-medium">Ready to cross-reference patient profile with laboratory findings and clinical markers.</p>
+                    
+                    {error && (
+                      <div className="bg-rose-500/20 border border-rose-500/50 p-4 rounded-2xl flex items-start gap-3 animate-fade-in">
+                        <XCircle size={20} className="text-rose-400 shrink-0 mt-0.5" />
+                        <p className="text-xs font-bold text-rose-100 leading-relaxed">{error}</p>
+                      </div>
+                    )}
+
                     <button 
                       onClick={handleAnalyze}
                       disabled={loading}

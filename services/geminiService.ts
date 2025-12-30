@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { PatientData, DiagnosisOutput, Language } from "../types";
 
@@ -9,11 +8,8 @@ export const analyzePatientData = async (
 ): Promise<DiagnosisOutput> => {
   const apiKey = process.env.API_KEY;
   
-  if (!apiKey) {
-    throw new Error("API_KEY_MISSING: Google Gemini API Key is not configured in the environment.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
+  // Create a fresh instance for every call as per guidelines
+  const ai = new GoogleGenAI({ apiKey: apiKey || "" });
   const modelName = "gemini-3-pro-preview";
   
   const labDataString = `

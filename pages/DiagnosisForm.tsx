@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Stethoscope, 
@@ -24,7 +23,8 @@ import {
   Scale,
   MoveVertical,
   Save,
-  XCircle
+  XCircle,
+  Key
 } from 'lucide-react';
 import LabInput from '../components/LabInput';
 import { PatientData, DiagnosisOutput, LabResult, User, SavedRecord } from '../types';
@@ -34,6 +34,9 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import AlcortexLogo from '../components/Logo';
 
+// Extension to support the platform's key selection API
+// Note: Window.aistudio is cast to any in the code to avoid conflicting global declarations
+
 interface DiagnosisFormProps {
   user: User;
   onSaveRecord: (record: SavedRecord) => Promise<void>;
@@ -42,10 +45,11 @@ interface DiagnosisFormProps {
 const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showKeyBtn, setShowKeyBtn] = useState(false);
   const [result, setResult] = useState<DiagnosisOutput | null>(null);
   const [step, setStep] = useState(1);
   const [isDraftSaved, setIsDraftSaved] = useState(false);
-  const t = translations[user.language];
+  t = translations[user.language];
   
   const [patient, setPatient] = useState<PatientData>({
     name: '',
@@ -124,10 +128,23 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
     }
   }, [patient.dob]);
 
+  const handleSelectKey = async () => {
+    // Fix: Using any casting for window to access platform-specific aistudio object
+    const aistudio = (window as any).aistudio;
+    if (aistudio) {
+      await aistudio.openSelectKey();
+      setError(null);
+      setShowKeyBtn(false);
+      // Wait a moment and retry is not needed as per instructions, proceed to let user click analyze again
+    }
+  };
+
   const handleAnalyze = async () => {
     setLoading(true);
     setError(null);
     setResult(null);
+    setShowKeyBtn(false);
+
     try {
       const analysis = await analyzePatientData(patient, user.language);
       setResult(analysis);
@@ -144,12 +161,20 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
     } catch (err: any) {
       console.error(err);
       let errorMessage = "Analysis failed. ";
-      if (err.message?.includes("API_KEY_MISSING")) {
-        errorMessage += "API Key is not configured. Please check environment variables.";
+      
+      // Detection for API key issues
+      const isKeyError = err.message?.includes("API_KEY") || 
+                        err.message?.includes("API key") || 
+                        err.message?.includes("403") || 
+                        err.message?.includes("entity was not found");
+
+      if (isKeyError) {
+        errorMessage += "Kunci API (API Key) belum dikonfigurasi atau tidak valid.";
+        setShowKeyBtn(true);
       } else if (err.message?.includes("fetch")) {
-        errorMessage += "Network error. Please check your internet connection.";
+        errorMessage += "Kesalahan jaringan. Silakan periksa koneksi internet Anda.";
       } else {
-        errorMessage += err.message || "An unexpected error occurred.";
+        errorMessage += err.message || "Terjadi kesalahan tak terduga.";
       }
       setError(errorMessage);
     } finally {
@@ -610,9 +635,19 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                     <p className="text-slate-300 font-medium">Ready to cross-reference patient profile with laboratory findings and clinical markers.</p>
                     
                     {error && (
-                      <div className="bg-rose-500/20 border border-rose-500/50 p-4 rounded-2xl flex items-start gap-3 animate-fade-in">
-                        <XCircle size={20} className="text-rose-400 shrink-0 mt-0.5" />
-                        <p className="text-xs font-bold text-rose-100 leading-relaxed">{error}</p>
+                      <div className="bg-rose-500/20 border border-rose-500/50 p-6 rounded-[32px] space-y-4 animate-fade-in">
+                        <div className="flex items-start gap-3">
+                          <XCircle size={20} className="text-rose-400 shrink-0 mt-0.5" />
+                          <p className="text-sm font-bold text-rose-100 leading-relaxed">{error}</p>
+                        </div>
+                        {showKeyBtn && (
+                          <button 
+                            onClick={handleSelectKey}
+                            className="w-full bg-white/10 hover:bg-white/20 border border-white/20 py-3 rounded-2xl flex items-center justify-center gap-2 transition-all font-black text-xs uppercase tracking-widest"
+                          >
+                            <Key size={14} /> {t.configAlerts || 'Konfigurasi API Key'}
+                          </button>
+                        )}
                       </div>
                     )}
 

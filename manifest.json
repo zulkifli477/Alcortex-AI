@@ -1,0 +1,25 @@
+
+{
+  "name": "Alcortex AI - Clinical Diagnostic",
+  "short_name": "Alcortex",
+  "description": "Precision AI Diagnostic Suite for Medical Professionals.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxMDAgMTAwJz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9J2cnIHgxPScwJScgeTE9JzAlJyB4Mj0nMTAwJScgeTI9JzEwMCUnPjxzdG9wIG9mZnNldD0nMCUnIHN0b3AtY29sb3I9JyMyNTYzZWInLz48c3RvcCBvZmZzZXQ9JzEwMCUnIHN0b3AtY29sb3I9JyMyZGQ0YmYnLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cGF0aCBkPSdNNTAgOEw4Ni40IDI5VjcxTDUwIDkyTDEzLjYgNzFWMjlMNTAgOFonIGZpbGw9J3VybCgjZyknIGZpbGwtb3BhY2l0eT0nMC4xJyBzdHJva2U9J3VybCgjZyknIHN0cm9rZS13aWR0aD0nMi41Jy8+PHBhdGggZD0nTTMyIDc1TDUwIDI1TDY4IDc1JyBzdHJva2U9J3VybCgjZyknIHN0cm9rZS13aWR0aD0nOCcgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJyBzdHJva2UtbGluZWpvaW49J3JvdW5kJy8+PHBhdGggZD0nTTM4IDU2SDQzTDQ2IDQ4TDUxIDY0TDU0IDU2SDYyJyBzdHJva2U9J3VybCgjZyknIHN0cm9rZS13aWR0aD0nNC41JyBzdHJva2UtbGluZWNhcD0ncm91bmQnIHN0cm9rZS1saW5lam9pbj0ncm91bmQnLz48Y2lyY2xlIGN4PSczMicgY3k9Jzc1JyByPSc0LjUnIGZpbGw9J3VybCgjZyknLz48Y2lyY2xlIGN4PSc2OCcgY3k9Jzc4JyByPSc0LjUnIGZpbGw9J3VybCgjZyknLz48Y2lyY2xlIGN4PSc1MCcgY3k9JzI1JyByPSc0LjUnIGZpbGw9J3VybCgjZyknLz48L3N2Zz4=",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxMDAgMTAwJz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9J2cnIHgxPScwJScgeTE9JzAlJyB4Mj0nMTAwJScgeTI9JzEwMCUnPjxzdG9wIG9mZnNldD0nMCUnIHN0b3AtY29sb3I9JyMyNTYzZWInLz48c3RvcCBvZmZzZXQ9JzEwMCUnIHN0b3AtY29sb3I9JyMyZGQ0YmYnLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cGF0aCBkPSdNNTAgOEw4Ni40IDI5VjcxTDUwIDkyTDEzLjYgNzFWMjlMNTAgOFonIGZpbGw9J3VybCgjZyknIGZpbGwtb3BhY2l0eT0nMC4xJyBzdHJva2U9J3VybCgjZyknIHN0cm9rZS13aWR0aD0nMi41Jy8+PHBhdGggZD0nTTMyIDc1TDUwIDI1TDY4IDc1JyBzdHJva2U9J3VybCgjZyknIHN0cm9rZS13aWR0aD0nOCcgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJyBzdHJva2UtbGluZWpvaW49J3JvdW5kJy8+PHBhdGggZD0nTTM4IDU2SDQzTDQ2IDQ4TDUxIDY0TDU0IDU2SDYyJyBzdHJva2U9J3VybCgjZyknIHN0cm9rZS13aWR0aD0nNC41JyBzdHJva2UtbGluZWNhcD0ncm91bmQnIHN0cm9rZS1saW5lam9pbj0ncm91bmQnLz48Y2lyY2xlIGN4PSczMicgY3k9Jzc1JyByPSc0LjUnIGZpbGw9J3VybCgjZyknLz48Y2lyY2xlIGN4PSc2OCcgY3k9Jzc4JyByPSc0LjUnIGZpbGw9J3VybCgjZyknLz48Y2lyY2xlIGN4PSc1MCcgY3k9JzI1JyByPSc0LjUnIGZpbGw9J3VybCgjZyknLz48L3N2Zz4=",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

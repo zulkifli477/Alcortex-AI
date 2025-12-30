@@ -1,0 +1,7 @@
+{
+  "name": "Alcortex AI - Clinical Diagnostic ",
+  "description": "A high-performance medical diagnosis AI platform designed for medical professionals. Features multi-modal analysis including clinical data, lab reports, and imaging (X-ray/CT).",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

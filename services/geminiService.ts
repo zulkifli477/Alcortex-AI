@@ -6,10 +6,8 @@ export const analyzePatientData = async (
   language: Language = Language.EN,
   imageUri?: string
 ): Promise<DiagnosisOutput> => {
-  const apiKey = process.env.API_KEY;
-  
-  // Create a fresh instance for every call as per guidelines
-  const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+  // STRICT COMPLIANCE: Use process.env.API_KEY directly
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
   const modelName = "gemini-3-pro-preview";
   
   const labDataString = `

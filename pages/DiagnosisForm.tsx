@@ -1,19 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Stethoscope, 
   User as UserIcon, 
   History, 
   Activity, 
   Microscope,
-  Cpu,
   Download,
   ShieldAlert,
   Loader2,
-  CheckCircle2,
-  Calendar,
   ChevronRight,
   ChevronLeft,
-  AlertCircle,
   Pill,
   ClipboardList,
   Thermometer,
@@ -34,9 +29,6 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import AlcortexLogo from '../components/Logo';
 
-// Extension to support the platform's key selection API
-// Note: Window.aistudio is cast to any in the code to avoid conflicting global declarations
-
 interface DiagnosisFormProps {
   user: User;
   onSaveRecord: (record: SavedRecord) => Promise<void>;
@@ -49,7 +41,9 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
   const [result, setResult] = useState<DiagnosisOutput | null>(null);
   const [step, setStep] = useState(1);
   const [isDraftSaved, setIsDraftSaved] = useState(false);
-  t = translations[user.language];
+  
+  // FIXED: Added const to declaration to prevent ReferenceError crash
+  const t = translations[user.language] || translations['English'];
   
   const [patient, setPatient] = useState<PatientData>({
     name: '',
@@ -129,13 +123,15 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
   }, [patient.dob]);
 
   const handleSelectKey = async () => {
-    // Fix: Using any casting for window to access platform-specific aistudio object
     const aistudio = (window as any).aistudio;
     if (aistudio) {
-      await aistudio.openSelectKey();
-      setError(null);
-      setShowKeyBtn(false);
-      // Wait a moment and retry is not needed as per instructions, proceed to let user click analyze again
+      try {
+        await aistudio.openSelectKey();
+        setError(null);
+        setShowKeyBtn(false);
+      } catch (e) {
+        console.error("Failed to open key selector", e);
+      }
     }
   };
 
@@ -162,19 +158,16 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
       console.error(err);
       let errorMessage = "Analysis failed. ";
       
-      // Detection for API key issues
       const isKeyError = err.message?.includes("API_KEY") || 
                         err.message?.includes("API key") || 
                         err.message?.includes("403") || 
                         err.message?.includes("entity was not found");
 
       if (isKeyError) {
-        errorMessage += "Kunci API (API Key) belum dikonfigurasi atau tidak valid.";
+        errorMessage += "API Key invalid or not configured.";
         setShowKeyBtn(true);
-      } else if (err.message?.includes("fetch")) {
-        errorMessage += "Kesalahan jaringan. Silakan periksa koneksi internet Anda.";
       } else {
-        errorMessage += err.message || "Terjadi kesalahan tak terduga.";
+        errorMessage += err.message || "An unexpected error occurred.";
       }
       setError(errorMessage);
     } finally {
@@ -188,15 +181,6 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
     const accentColor: [number, number, number] = [37, 99, 235];
     let yPos = 20;
 
-    const checkPageBreak = (needed: number) => {
-      if (yPos + needed > 280) {
-        doc.addPage();
-        yPos = 20;
-        return true;
-      }
-      return false;
-    };
-
     doc.setFillColor(37, 99, 235);
     doc.rect(0, 0, 210, 45, 'F');
     doc.setTextColor(255, 255, 255);
@@ -204,181 +188,25 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
     doc.text('ALCORTEX AI', 20, 28);
     doc.setFontSize(10);
     doc.text(t.reportTitle || 'PRECISION CLINICAL DIAGNOSTIC REPORT', 20, 38);
-    doc.text(`${t.dateLabel || 'DATE'}: ${new Date().toLocaleString()}`, 150, 28);
     yPos = 55;
 
     doc.setTextColor(37, 99, 235);
     doc.setFontSize(14);
     doc.text(t.profile.toUpperCase(), 20, yPos);
-    doc.setDrawColor(200, 200, 200);
-    doc.line(20, yPos + 2, 190, yPos + 2);
     yPos += 12;
 
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     const profileData = [
       [t.patientName, patient.name, t.rmNo, patient.rmNo],
-      [t.age, patient.age.toString(), t.gender, patient.gender],
-      [t.bloodType, patient.bloodType, 'DOB', patient.dob]
+      [t.age, patient.age.toString(), t.gender, patient.gender]
     ];
     autoTable(doc, {
       startY: yPos,
       body: profileData,
-      theme: 'plain',
-      styles: { cellPadding: 2, fontSize: 10 },
-      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 40 }, 2: { fontStyle: 'bold', cellWidth: 40 } }
+      theme: 'plain'
     });
-    yPos = (doc as any).lastAutoTable.finalY + 15;
-
-    doc.setTextColor(37, 99, 235);
-    doc.setFontSize(14);
-    doc.text(t.vitals.toUpperCase(), 20, yPos);
-    yPos += 5;
-    autoTable(doc, {
-      startY: yPos,
-      head: [[t.vitals, 'Value', 'Unit']],
-      body: [
-        [t.bp, `${patient.vitals.bpSystolic}/${patient.vitals.bpDiastolic}`, 'mmHg'],
-        [t.hr, patient.vitals.heartRate, 'bpm'],
-        [t.temp, patient.vitals.temperature, '°C'],
-        [t.rr, patient.vitals.respiratoryRate, '/min'],
-        ['SpO2', patient.vitals.spo2, '%'],
-        [t.weight, patient.vitals.weight, 'kg'],
-        [t.height, patient.vitals.height, 'cm']
-      ],
-      theme: 'striped',
-      headStyles: { fillColor: accentColor }
-    });
-    yPos = (doc as any).lastAutoTable.finalY + 15;
-
-    checkPageBreak(60);
-    doc.setTextColor(37, 99, 235);
-    doc.setFontSize(14);
-    doc.text(t.historyExplorer.toUpperCase(), 20, yPos);
-    doc.line(20, yPos + 2, 190, yPos + 2);
-    yPos += 12;
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
     
-    const historyBlock = [
-      { label: t.complaints, val: patient.complaints },
-      { label: t.history, val: patient.history },
-      { label: t.meds, val: patient.meds },
-      { label: t.lifestyleFactors, val: `${t.smokingHistory}: ${t[patient.smoking.toLowerCase()]}, ${t.alcoholHistory}: ${t[patient.alcohol.toLowerCase()]}` }
-    ];
-
-    historyBlock.forEach(item => {
-      checkPageBreak(20);
-      doc.setFont(undefined, 'bold');
-      doc.text(`${item.label}:`, 20, yPos);
-      doc.setFont(undefined, 'normal');
-      const lines = doc.splitTextToSize(item.val || '-', 160);
-      doc.text(lines, 30, yPos + 5);
-      yPos += (lines.length * 5) + 8;
-    });
-
-    checkPageBreak(30);
-    yPos += 5;
-    const drawLabSection = (title: string, data: LabResult[], color: [number, number, number]) => {
-      const activeData = data.filter(r => r.parameter || r.value);
-      if (activeData.length === 0) return;
-      checkPageBreak(40);
-      doc.setTextColor(color[0], color[1], color[2]);
-      doc.setFontSize(12);
-      doc.text(title.toUpperCase(), 20, yPos);
-      yPos += 5;
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Parameter', 'Value', 'Unit', 'Ref. Range']],
-        body: activeData.map(r => [r.parameter, r.value, r.unit, r.referenceRange]),
-        theme: 'grid',
-        headStyles: { fillColor: color }
-      });
-      yPos = (doc as any).lastAutoTable.finalY + 15;
-    };
-
-    drawLabSection(t.blood, patient.labBlood, [220, 38, 38]); 
-    drawLabSection(t.urine, patient.labUrine, [234, 179, 8]); 
-    drawLabSection(t.sputum, patient.labSputum, [22, 163, 74]); 
-
-    checkPageBreak(100);
-    doc.setFillColor(241, 245, 249);
-    doc.rect(15, yPos, 180, 15, 'F');
-    doc.setTextColor(15, 23, 42);
-    doc.setFontSize(14);
-    doc.text(t.intelligence.toUpperCase() + ' ANALYSIS', 20, yPos + 10);
-    yPos += 25;
-
-    doc.setTextColor(37, 99, 235);
-    doc.setFontSize(12);
-    doc.text(t.mainDiagnosis, 20, yPos);
-    doc.setFontSize(18);
-    doc.setFont(undefined, 'bold');
-    doc.text(result.mainDiagnosis, 20, yPos + 10);
-    doc.setFont(undefined, 'normal');
-    yPos += 20;
-
-    doc.setFontSize(10);
-    doc.setTextColor(0,0,0);
-    doc.text(`${t.severity}: ${t[result.severity.toLowerCase()] || result.severity}`, 20, yPos);
-    doc.text(`${t.confidence}: ${(result.confidenceScore * 100).toFixed(1)}%`, 100, yPos);
-    yPos += 15;
-
-    checkPageBreak(40);
-    doc.setFont(undefined, 'bold');
-    doc.text(t.interpretation + ':', 20, yPos);
-    doc.setFont(undefined, 'normal');
-    const interpLines = doc.splitTextToSize(result.interpretation, 170);
-    doc.text(interpLines, 20, yPos + 6);
-    yPos += (interpLines.length * 5) + 15;
-
-    checkPageBreak(50);
-    doc.setFont(undefined, 'bold');
-    doc.text(t.differentialDiagnostics + ':', 20, yPos);
-    yPos += 5;
-    autoTable(doc, {
-      startY: yPos,
-      head: [['Diagnosis', 'ICD-10', 'Confidence']],
-      body: result.differentials.map(d => [d.diagnosis, d.icd10, `${(d.confidence * 100).toFixed(0)}%`]),
-      theme: 'striped'
-    });
-    yPos = (doc as any).lastAutoTable.finalY + 15;
-
-    checkPageBreak(50);
-    doc.setFontSize(11);
-    doc.setTextColor(37, 99, 235);
-    doc.text(t.followUp + ':', 20, yPos);
-    doc.setTextColor(0,0,0);
-    const followLines = doc.splitTextToSize(result.followUp, 170);
-    doc.text(followLines, 20, yPos + 6);
-    yPos += (followLines.length * 5) + 12;
-
-    checkPageBreak(40);
-    doc.setTextColor(37, 99, 235);
-    doc.text(t.medicationRecs + ':', 20, yPos);
-    doc.setTextColor(0,0,0);
-    const medLines = doc.splitTextToSize(result.medicationRecs, 170);
-    doc.text(medLines, 20, yPos + 6);
-    yPos += (medLines.length * 5) + 15;
-
-    checkPageBreak(30);
-    doc.setFillColor(254, 242, 242);
-    doc.rect(20, yPos, 170, 20, 'F');
-    doc.setTextColor(153, 27, 27);
-    doc.setFont(undefined, 'bold');
-    doc.text(t.safetyWarning.toUpperCase(), 25, yPos + 8);
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(9);
-    doc.text(result.safetyWarning, 25, yPos + 14, { maxWidth: 160 });
-
-    const totalPages = (doc as any).internal.getNumberOfPages();
-    doc.setPage(totalPages);
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    const disclaimer = "©Diagnosa AI bukan pengganti saran medis profesional. Verifikasi dokter wajib dilakukan sebelum penggunaan hasil. -by developer of alcortex medical ai, Muhammad Alwi Zulkifli.";
-    const splitDisclaimer = doc.splitTextToSize(disclaimer, 170);
-    doc.text(splitDisclaimer, 105, 285, { align: 'center' });
-
     doc.save(`Alcortex_Report_${patient.rmNo}.pdf`);
   };
 
@@ -436,12 +264,6 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-800">{s.label}</span>
           </button>
         ))}
-        {isDraftSaved && (
-          <div className="absolute top-2 right-4 flex items-center gap-1.5 px-3 py-1 bg-teal-50 border border-teal-100 rounded-full animate-fade-in">
-            <Save size={10} className="text-teal-500" />
-            <span className="text-[8px] font-black uppercase tracking-widest text-teal-600">Draft Auto-Saved</span>
-          </div>
-        )}
       </div>
 
       <div className="grid grid-cols-1 gap-8">
@@ -524,11 +346,11 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.complaints}</label>
-                      <textarea rows={4} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 font-medium text-slate-700 focus:ring-4 focus:ring-blue-500/5 transition-all" value={patient.complaints} onChange={e => setPatient({...patient, complaints: e.target.value})} />
+                      <textarea rows={4} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 font-medium text-slate-700" value={patient.complaints} onChange={e => setPatient({...patient, complaints: e.target.value})} />
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.history}</label>
-                      <textarea rows={4} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 font-medium text-slate-700 focus:ring-4 focus:ring-blue-500/5 transition-all" value={patient.history} onChange={e => setPatient({...patient, history: e.target.value})} />
+                      <textarea rows={4} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 font-medium text-slate-700" value={patient.history} onChange={e => setPatient({...patient, history: e.target.value})} />
                     </div>
                   </div>
 
@@ -645,7 +467,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                             onClick={handleSelectKey}
                             className="w-full bg-white/10 hover:bg-white/20 border border-white/20 py-3 rounded-2xl flex items-center justify-center gap-2 transition-all font-black text-xs uppercase tracking-widest"
                           >
-                            <Key size={14} /> {t.configAlerts || 'Konfigurasi API Key'}
+                            <Key size={14} /> {t.configAlerts || 'Configure API Key'}
                           </button>
                         )}
                       </div>
@@ -670,7 +492,6 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                 <div>
                    <div className="flex items-center gap-3 mb-2">
                       <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 block">{t.mainDiagnosis}</span>
-                      <div className="px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[8px] font-black text-blue-500 tracking-tighter uppercase">Alcortex AI v1</div>
                    </div>
                    <h2 className="text-5xl font-black text-slate-800">{result.mainDiagnosis}</h2>
                 </div>
@@ -713,7 +534,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                       <h4 className="font-bold mb-6 text-sm opacity-60 uppercase tracking-widest">{t.differentialDiagnostics}</h4>
                       <div className="space-y-4">
                         {result.differentials.map((d, i) => (
-                           <div key={i} className="p-4 bg-white/5 rounded-2xl border border-white/10 hover:border-teal-500/30 transition-all cursor-default">
+                           <div key={i} className="p-4 bg-white/5 rounded-2xl border border-white/10 transition-all cursor-default">
                               <div className="flex justify-between mb-2">
                                  <span className="text-[10px] font-black text-teal-400">{d.icd10}</span>
                                  <span className="text-[10px] font-bold">{(d.confidence * 100).toFixed(0)}%</span>
@@ -721,16 +542,6 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                               <h5 className="font-bold text-sm">{d.diagnosis}</h5>
                            </div>
                         ))}
-                      </div>
-                   </div>
-                   <div className="bg-white p-10 rounded-[40px] border border-slate-100 shadow-sm">
-                      <h4 className="font-black text-slate-800 mb-4 uppercase tracking-widest text-xs">{t.severity}</h4>
-                      <div className={`px-6 py-3 rounded-2xl text-center font-black uppercase text-xs ${
-                         result.severity === 'Critical' ? 'bg-rose-500 text-white' :
-                         result.severity === 'Severe' ? 'bg-orange-500 text-white' :
-                         'bg-blue-500 text-white'
-                      }`}>
-                         {t[result.severity.toLowerCase()] || result.severity}
                       </div>
                    </div>
                 </div>

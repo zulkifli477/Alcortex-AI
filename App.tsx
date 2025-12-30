@@ -48,19 +48,18 @@ const App: React.FC = () => {
   
   useEffect(() => {
     const initApp = async () => {
-      const savedUser = localStorage.getItem('alcortex_user');
-      if (savedUser) {
-        const parsedUser = JSON.parse(savedUser);
-        setUser(parsedUser);
-        databaseService.logActivity(parsedUser.email, 'SESSION_RESUMED');
-      }
-
       try {
+        const savedUser = localStorage.getItem('alcortex_user');
+        if (savedUser) {
+          const parsedUser = JSON.parse(savedUser);
+          setUser(parsedUser);
+          databaseService.logActivity(parsedUser.email, 'SESSION_RESUMED');
+        }
+
         const fetchedRecords = await databaseService.getRecords();
         setRecords(Array.isArray(fetchedRecords) ? fetchedRecords : []);
       } catch (error) {
-        console.error("Failed to fetch records:", error);
-        setRecords([]);
+        console.error("Initialization error:", error);
       }
     };
 
@@ -70,11 +69,14 @@ const App: React.FC = () => {
   const handleLogin = async (u: User) => {
     setUser(u);
     localStorage.setItem('alcortex_user', JSON.stringify(u));
-    await databaseService.registerUser(u);
-    await databaseService.logActivity(u.email, 'LOGIN');
-    // Refresh records after login
-    const fetchedRecords = await databaseService.getRecords();
-    setRecords(fetchedRecords);
+    try {
+      await databaseService.registerUser(u);
+      await databaseService.logActivity(u.email, 'LOGIN');
+      const fetchedRecords = await databaseService.getRecords();
+      setRecords(fetchedRecords);
+    } catch (e) {
+      // If network fails, we still have local state set
+    }
   };
 
   const handleLogout = async () => {
@@ -97,7 +99,8 @@ const App: React.FC = () => {
     return <AuthPage onLogin={handleLogin} />;
   }
 
-  const t = translations[user.language] || translations[Language.EN];
+  const languageKey = user.language in translations ? user.language : Language.EN;
+  const t = translations[languageKey];
 
   return (
     <div className="min-h-screen bg-slate-50 flex">

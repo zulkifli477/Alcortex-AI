@@ -1,25 +1,40 @@
 
 import { User, SavedRecord } from '../types';
 
-// Alamat server backend Anda
-const API_BASE_URL = 'http://localhost:5000/api';
-
 /**
- * Service ini sekarang terhubung ke REAL MySQL via Express API.
+ * Logika untuk mendapatkan URL API yang benar.
+ * Jika di Codespaces, kita harus menggunakan URL forwarded, bukan localhost.
  */
+const getBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    // Jika di Codespaces, URL biasanya berbentuk *-3000.app.github.dev
+    // Kita ganti port 3000 ke 5000 untuk backend
+    if (hostname.includes('github.dev') || hostname.includes('preview.app.github.dev')) {
+      return `https://${hostname.replace('-3000', '-5000')}/api`;
+    }
+  }
+  return 'http://localhost:5000/api';
+};
+
+const API_BASE_URL = getBaseUrl();
+
 export const databaseService = {
-  // --- USER & AUTH LOGIC ---
   async registerUser(user: User): Promise<void> {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      
       const response = await fetch(`${API_BASE_URL}/users/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(user)
+        body: JSON.stringify(user),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       if (!response.ok) throw new Error('Failed to register user');
     } catch (error) {
-      console.error('[DB ERROR] User registration failed:', error);
-      // Fallback ke localStorage jika server mati
+      console.warn('[DB INFO] Using local storage for user registration (Backend offline)');
       const users = this.getUsersLocal();
       if (!users.find(u => u.email === user.email)) {
         users.push(user);
@@ -33,7 +48,6 @@ export const databaseService = {
     return data ? JSON.parse(data) : [];
   },
 
-  // --- ACTIVITY LOGGING ---
   async logActivity(email: string, action: string): Promise<void> {
     try {
       await fetch(`${API_BASE_URL}/activity`, {
@@ -41,13 +55,11 @@ export const databaseService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, action })
       });
-      console.log(`[DB LOG] MySQL: User ${email} performed ${action}`);
     } catch (error) {
-      console.warn('[DB LOG] Fallback: Server offline, logging to console only.');
+      // Silent fail for logs
     }
   },
 
-  // --- EMR & DIAGNOSIS LOGIC ---
   async saveDiagnosis(userEmail: string, record: SavedRecord): Promise<void> {
     try {
       const response = await fetch(`${API_BASE_URL}/records`, {
@@ -64,8 +76,7 @@ export const databaseService = {
       });
       if (!response.ok) throw new Error('Server rejected save');
     } catch (error) {
-      console.error('[DB ERROR] Failed to save to MySQL:', error);
-      // Simpan lokal sebagai cadangan
+      console.error('[DB ERROR] Saving to Local (Backend offline)');
       const records = this.getRecordsLocal();
       records.unshift(record);
       localStorage.setItem('alcortex_emr_vault', JSON.stringify(records));

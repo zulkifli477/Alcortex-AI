@@ -6,6 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Alcortex AI</title>
     
+    <!-- Shim for process.env to prevent crashes in pure ESM environment -->
+    <script>
+      window.process = {
+        env: {
+          API_KEY: "" // Will be injected by the environment or handled by the system
+        }
+      };
+    </script>
+
     <!-- PWA & Mobile Optimization -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2563eb">
@@ -23,24 +32,17 @@
         
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slide-up { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slide-down { from { opacity: 0; transform: translateY(-30px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes scale-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         @keyframes float { 0%, 100% { transform: translateY(0) translateX(0); } 33% { transform: translateY(-20px) translateX(10px); } 66% { transform: translateY(10px) translateX(-15px); } }
-        @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 0.5; } 100% { transform: scale(1.3); opacity: 0; } }
 
         .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
         .animate-slide-up { animation: slide-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .animate-scale-in { animation: scale-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .animate-float { animation: float 10s ease-in-out infinite; }
-        .animate-float-slow { animation: float 15s ease-in-out infinite reverse; }
         
-        /* Smooth scrolling for mobile */
         * { scroll-behavior: smooth; }
-        
-        /* Hide scrollbars but keep functionality */
         .custom-scrollbar::-webkit-scrollbar { width: 0px; background: transparent; }
         
-        /* Stagger helper classes */
         .stagger-1 { animation-delay: 100ms; }
         .stagger-2 { animation-delay: 200ms; }
         .stagger-3 { animation-delay: 300ms; }
@@ -64,14 +66,5 @@
 </head>
 <body class="bg-slate-50 text-slate-900 overscroll-none">
     <div id="root"></div>
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log('Service Worker registered'))
-                    .catch(err => console.log('Service Worker failed', err));
-            });
-        }
-    </script>
 </body>
 </html>

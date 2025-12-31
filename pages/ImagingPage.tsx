@@ -1,13 +1,8 @@
 import React, { useState } from 'react';
 import { 
-  Image as ImageIcon, 
-  Upload, 
-  Cpu, 
-  CheckCircle2, 
-  Loader2,
-  AlertTriangle
+  Image as ImageIcon, Upload, Cpu, CheckCircle2, Loader2, AlertTriangle
 } from 'lucide-react';
-import { analyzePatientData } from '../services/geminiService';
+import { apiService } from '../frontend/services/api';
 import { PatientData, DiagnosisOutput, User } from '../types';
 import { translations } from '../translations';
 import AlcortexLogo from '../components/Logo';
@@ -26,9 +21,7 @@ const ImagingPage: React.FC<ImagingPageProps> = ({ user }) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result as string);
-      };
+      reader.onloadend = () => { setImage(reader.result as string); };
       reader.readAsDataURL(file);
     }
   };
@@ -37,36 +30,16 @@ const ImagingPage: React.FC<ImagingPageProps> = ({ user }) => {
     if (!image) return;
     setLoading(true);
     try {
-      // Added missing bloodType property to satisfy PatientData interface requirement
       const mockPatient: PatientData = {
-        name: 'Imaging Analysis',
-        rmNo: 'IMG-' + Date.now(),
-        dob: '', 
-        age: 0, 
-        gender: 'Other',
-        bloodType: 'Unknown',
-        history: 'Visual imaging analysis requested.',
-        meds: '', 
-        allergies: '',
-        smoking: 'None', 
-        alcohol: 'None', 
-        activity: '',
-        complaints: 'Radiological findings analysis.',
-        vitals: {
-          bpSystolic: '',
-          bpDiastolic: '',
-          heartRate: '',
-          respiratoryRate: '',
-          temperature: '',
-          spo2: '',
-          weight: '',
-          height: ''
-        },
-        labBlood: [], 
-        labUrine: [], 
-        labSputum: []
+        name: 'Imaging Analysis', rmNo: 'IMG-' + Date.now(), dob: '', age: 0, gender: 'Other',
+        bloodType: 'Unknown', history: 'Visual imaging analysis requested.', meds: '', allergies: '',
+        smoking: 'None', alcohol: 'None', activity: '', complaints: 'Radiological findings analysis.',
+        vitals: { bpSystolic: '', bpDiastolic: '', heartRate: '', respiratoryRate: '', temperature: '', spo2: '', weight: '', height: '' },
+        labBlood: [], labUrine: [], labSputum: []
       };
-      const res = await analyzePatientData(mockPatient, user.language, image);
+      
+      // Menggunakan apiService yang terhubung ke OpenAI GPT-4o Vision di backend
+      const res = await apiService.analyzePatient(mockPatient, user.language, image);
       setAnalysis(res);
     } catch (err) {
       alert("Imaging analysis failed.");
@@ -86,38 +59,23 @@ const ImagingPage: React.FC<ImagingPageProps> = ({ user }) => {
             {t.radiologyIntake}
           </h3>
           
-          <div 
-            className={`relative border-2 border-dashed rounded-[40px] h-96 flex flex-col items-center justify-center transition-all ${
-              image ? 'border-blue-500 bg-blue-50/10' : 'border-slate-200 hover:border-blue-400 hover:bg-slate-50'
-            }`}
-          >
+          <div className={`relative border-2 border-dashed rounded-[40px] h-96 flex flex-col items-center justify-center transition-all ${image ? 'border-blue-500 bg-blue-50/10' : 'border-slate-200 hover:border-blue-400 hover:bg-slate-50'}`}>
             {image ? (
               <>
                 <img src={image} alt="preview" className="h-full w-full object-contain p-6" />
-                <button 
-                  onClick={() => setImage(null)}
-                  className="absolute top-6 right-6 bg-rose-500 text-white p-3 rounded-2xl shadow-xl hover:bg-rose-600 transition-colors"
-                >
-                  &times;
-                </button>
+                <button onClick={() => setImage(null)} className="absolute top-6 right-6 bg-rose-500 text-white p-3 rounded-2xl shadow-xl hover:bg-rose-600 transition-colors">&times;</button>
               </>
             ) : (
               <label className="cursor-pointer flex flex-col items-center p-10 text-center">
-                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
-                   <ImageIcon size={32} className="text-slate-300" />
-                </div>
+                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6"><ImageIcon size={32} className="text-slate-300" /></div>
                 <span className="text-slate-800 font-bold text-lg">{t.uploadRadiograph}</span>
-                <span className="text-xs text-slate-400 mt-2 max-w-xs leading-relaxed uppercase tracking-wider font-medium">{t.scanSupport}</span>
+                <span className="text-xs text-slate-400 mt-2 uppercase tracking-wider font-medium">{t.scanSupport}</span>
                 <input type="file" className="hidden" onChange={handleFileChange} accept="image/*" />
               </label>
             )}
           </div>
 
-          <button 
-            disabled={!image || loading}
-            onClick={handleAnalyze}
-            className="w-full bg-gradient-to-r from-blue-600 to-teal-500 text-white py-6 rounded-3xl font-black flex items-center justify-center gap-4 disabled:opacity-50 hover:shadow-2xl hover:shadow-blue-500/20 transition-all uppercase tracking-widest text-sm"
-          >
+          <button disabled={!image || loading} onClick={handleAnalyze} className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black flex items-center justify-center gap-4 hover:shadow-2xl transition-all uppercase tracking-widest text-sm">
             {loading ? <Loader2 className="animate-spin" /> : <AlcortexLogo size={20} />}
             {loading ? t.processingVision : t.initiateScan}
           </button>
@@ -126,43 +84,29 @@ const ImagingPage: React.FC<ImagingPageProps> = ({ user }) => {
         <div className="space-y-8">
           {!analysis ? (
              <div className="bg-slate-50 border border-slate-100 rounded-[40px] p-20 flex flex-col items-center justify-center text-center">
-                <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mb-6 shadow-sm">
-                  <AlertTriangle size={32} className="text-slate-200" />
-                </div>
+                <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center mb-6 shadow-sm"><AlertTriangle size={32} className="text-slate-200" /></div>
                 <h4 className="text-slate-400 font-bold uppercase tracking-widest text-xs">{t.waitingInput}</h4>
-                <p className="text-slate-300 text-sm mt-3 max-w-xs">{t.waitingInputDesc}</p>
+                <p className="text-slate-300 text-sm mt-3">{t.waitingInputDesc}</p>
              </div>
           ) : (
             <div className="animate-fade-in space-y-8">
                <div className="bg-gradient-to-br from-blue-700 to-blue-900 p-10 rounded-[40px] text-white shadow-2xl relative overflow-hidden">
-                  <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
                   <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">{t.visualDiagnostic}</span>
                   <h3 className="text-3xl font-black mt-4 tracking-tight">{analysis.mainDiagnosis}</h3>
                   <div className="flex gap-6 mt-10">
                     <div className="bg-white/10 px-6 py-3 rounded-2xl backdrop-blur-md border border-white/5">
-                      <p className="text-[10px] opacity-60 font-black uppercase tracking-wider">{t.confidence}</p>
+                      <p className="text-[10px] opacity-60 font-black uppercase">{t.confidence}</p>
                       <p className="text-xl font-black text-teal-300">{(analysis.confidenceScore * 100).toFixed(1)}%</p>
                     </div>
                     <div className="bg-white/10 px-6 py-3 rounded-2xl backdrop-blur-md border border-white/5">
-                      <p className="text-[10px] opacity-60 font-black uppercase tracking-wider">{t.severity}</p>
-                      <p className="text-xl font-black text-blue-300">{t[analysis.severity.toLowerCase()] || analysis.severity}</p>
+                      <p className="text-[10px] opacity-60 font-black uppercase">{t.severity}</p>
+                      <p className="text-xl font-black text-blue-300">{analysis.severity}</p>
                     </div>
                   </div>
                </div>
-
                <div className="bg-white p-10 rounded-[40px] border border-slate-100 shadow-sm">
                   <h4 className="font-black text-slate-800 mb-6 uppercase tracking-widest text-xs">{t.imagingInterpretation}</h4>
                   <p className="text-sm text-slate-500 leading-relaxed font-medium">{analysis.interpretation}</p>
-               </div>
-
-               <div className="bg-teal-50 p-8 rounded-[40px] border border-teal-100 flex items-center gap-6">
-                  <div className="w-14 h-14 rounded-2xl bg-teal-100 flex items-center justify-center text-teal-600 shadow-inner">
-                     <CheckCircle2 size={24} />
-                  </div>
-                  <div>
-                    <h4 className="font-black text-teal-900 text-sm">{t.featureVerified}</h4>
-                    <p className="text-[10px] text-teal-700/60 font-bold uppercase tracking-widest mt-1">{t.patternMatch}</p>
-                  </div>
                </div>
             </div>
           )}

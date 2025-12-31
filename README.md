@@ -1,20 +1,17 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Alcortex AI - Clinical Diagnostic Suite
 
-# Run and deploy your AI Studio app
+A high-performance medical diagnosis AI platform designed for medical professionals.
 
-This contains everything you need to run your app locally.
+## Project Structure
+- `/frontend`: React client application.
+- `/backend`: Node.js Express server using TypeScript.
+  - `/src/services`: Contains the OpenAI GPT-4o engine.
+  - `/src/controllers`: API endpoint logic.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1_9Ag1fFFq8OocuKJ8fDoSAo-7bbD188y
+## AI Engine
+Now exclusively using **OpenAI GPT-4o** for clinical synthesis and visual analysis. All Google Gemini dependencies have been removed for project consistency and performance.
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Getting Started
+1. Configure `.env` in the `/backend` folder.
+2. Run backend: `npm run server`
+3. Run frontend: `npm run dev`

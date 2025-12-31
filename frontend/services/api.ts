@@ -1,10 +1,6 @@
 
-import { PatientData, DiagnosisOutput, Language } from "../../types";
+import { PatientData, DiagnosisOutput, Language } from "../types";
 
-/**
- * apiService bertindak sebagai bridge ke Backend.
- * Semua pemrosesan AI sekarang dilakukan di sisi server (GPT-4o).
- */
 export const apiService = {
   async analyzePatient(
     patient: PatientData, 
@@ -12,6 +8,7 @@ export const apiService = {
     imageUri?: string
   ): Promise<DiagnosisOutput> {
     try {
+      // Endpoint tetap mengarah ke backend yang sama (/api/analyze)
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: {

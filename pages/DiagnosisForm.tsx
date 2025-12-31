@@ -1,33 +1,14 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
-  User as UserIcon, 
-  History, 
-  Activity, 
-  Microscope,
-  Download,
-  ShieldAlert,
-  Loader2,
-  ChevronRight,
-  ChevronLeft,
-  Pill,
-  IdCard,
-  Heart,
-  Wind,
-  Droplets,
-  Scale,
-  Stethoscope,
-  Calendar,
-  CheckCircle2,
-  FileText,
-  Thermometer,
-  XCircle,
-  Zap
+  User as UserIcon, History, Activity, Microscope, Download, ShieldAlert,
+  Loader2, ChevronRight, ChevronLeft, Pill, IdCard, Heart, Wind, Droplets,
+  Scale, Stethoscope, Calendar, CheckCircle2, FileText, Thermometer,
+  XCircle, Zap
 } from 'lucide-react';
 import LabInput from '../components/LabInput';
 import { PatientData, DiagnosisOutput, User, SavedRecord, Vitals } from '../types';
 import { translations } from '../translations';
-import { analyzePatientData } from '../services/geminiService';
+import { apiService } from '../frontend/services/api';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import AlcortexLogo from '../components/Logo';
@@ -47,19 +28,9 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
   const t = translations[user.language] || translations['English'];
   
   const [patient, setPatient] = useState<PatientData>({
-    name: '',
-    rmNo: '',
-    dob: '',
-    age: 0,
-    gender: 'Male',
-    bloodType: 'A+',
-    history: '',
-    meds: '',
-    allergies: '',
-    smoking: 'None',
-    alcohol: 'None',
-    activity: 'Moderate',
-    complaints: '',
+    name: '', rmNo: '', dob: '', age: 0, gender: 'Male', bloodType: 'A+',
+    history: '', meds: '', allergies: '', smoking: 'None', alcohol: 'None',
+    activity: 'Moderate', complaints: '',
     vitals: {
       bpSystolic: '', bpDiastolic: '', heartRate: '', respiratoryRate: '',
       temperature: '', spo2: '', weight: '', height: ''
@@ -70,10 +41,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
   useEffect(() => {
     const draft = localStorage.getItem('alcortex_patient_draft');
     if (draft) {
-      try {
-        const parsed = JSON.parse(draft);
-        setPatient(parsed);
-      } catch (e) { console.error(e); }
+      try { setPatient(JSON.parse(draft)); } catch (e) { console.error(e); }
     }
   }, []);
 
@@ -113,7 +81,8 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
     setLoading(true);
     setError(null);
     try {
-      const analysis = await analyzePatientData(patient, user.language);
+      // Menggunakan apiService (OpenAI Backend) sebagai pengganti Gemini
+      const analysis = await apiService.analyzePatient(patient, user.language);
       setResult(analysis);
       await onSaveRecord({ id: 'ALCOR-' + Date.now(), date: new Date().toISOString(), patient: JSON.parse(JSON.stringify(patient)), analysis });
       localStorage.removeItem('alcortex_patient_draft');
@@ -130,7 +99,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Header
+    // Header Branding
     doc.setFillColor(15, 23, 42); 
     doc.rect(0, 0, pageWidth, 50, 'F');
     doc.setTextColor(255, 255, 255);
@@ -174,7 +143,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: 40 } }
     });
 
-    // Vitals & Lifestyle
+    // Vitals
     doc.text('III. VITALS & LIFESTYLE', 20, (doc as any).lastAutoTable.finalY + 15);
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 20,
@@ -194,7 +163,6 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
       headStyles: { fillColor: [51, 65, 85] }
     });
 
-    // Labs (Modular Tables)
     const renderLab = (title: string, data: any[]) => {
       if (data.length === 0) return;
       doc.setFontSize(14);
@@ -212,7 +180,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
     renderLab(`V. URINE ANALYSIS RESULTS`, patient.labUrine);
     renderLab(`VI. SPUTUM ANALYSIS RESULTS`, patient.labSputum);
 
-    // AI Analysis Panel
+    // AI Analysis Result
     doc.setFillColor(37, 99, 235);
     doc.rect(20, (doc as any).lastAutoTable.finalY + 10, pageWidth - 40, 30, 'F');
     doc.setTextColor(255, 255, 255);
@@ -221,10 +189,6 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
     doc.setFontSize(18);
     doc.text(result.mainDiagnosis.toUpperCase(), 25, (doc as any).lastAutoTable.finalY + 32);
 
-    // Differential & Plan
-    doc.setTextColor(15, 23, 42);
-    doc.setFontSize(12);
-    doc.text('DIAGNOSTIC PLAN & INTERPRETATION', 20, (doc as any).lastAutoTable.finalY + 50);
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 55,
       theme: 'plain',
@@ -238,19 +202,18 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: 40 } }
     });
 
-    // Footer
     doc.setFontSize(8);
     doc.setTextColor(148, 163, 184);
     doc.text(t.pdfFooter, pageWidth / 2, doc.internal.pageSize.getHeight() - 15, { align: 'center' });
 
-    doc.save(`Alcortex_Clinical_Report_${patient.rmNo}.pdf`);
+    doc.save(`Alcortex_Report_${patient.rmNo}.pdf`);
   };
 
-  const ChipGroup = ({ label, options, value, onChange }: { label: string, options: any[], value: string, onChange: (v: any) => void }) => (
+  const ChipGroup = ({ label, options, value, onChange }: any) => (
     <div className="space-y-3">
       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
       <div className="flex flex-wrap gap-2">
-        {options.map((opt) => (
+        {options.map((opt: any) => (
           <button
             key={opt.id}
             type="button"
@@ -268,7 +231,6 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-32">
-      {/* Visual Stepper */}
       <div className="bg-white p-4 rounded-[32px] border border-slate-100 shadow-sm flex justify-between items-center px-10 relative overflow-hidden">
         <div className="absolute top-0 left-0 h-1 bg-slate-50 w-full">
            <div className="h-full bg-gradient-to-r from-blue-600 to-teal-500 transition-all duration-700" style={{ width: `${(step/4)*100}%` }}></div>
@@ -280,7 +242,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
           { id: 4, label: t.intelligence, icon: Stethoscope }
         ].map(s => (
           <div key={s.id} className={`flex flex-col items-center gap-2 transition-all ${step === s.id ? 'opacity-100 scale-105' : 'opacity-25'}`}>
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${step === s.id ? 'bg-gradient-to-br from-blue-600 to-teal-500 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-50 text-slate-400'}`}>
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${step === s.id ? 'bg-gradient-to-br from-blue-600 to-teal-500 text-white shadow-lg' : 'bg-slate-50 text-slate-400'}`}>
               <s.icon size={20} />
             </div>
             <span className="text-[9px] font-black uppercase tracking-widest">{s.label}</span>
@@ -307,11 +269,11 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
               <div className="space-y-4">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">{t.patientName}</label>
-                <input className="w-full bg-slate-50 border-2 border-transparent rounded-3xl px-8 py-5 font-bold text-lg text-slate-800 focus:bg-white focus:border-blue-500/20 outline-none transition-all shadow-inner" value={patient.name} onChange={e => setPatient({...patient, name: e.target.value})} placeholder="..." />
+                <input className="w-full bg-slate-50 border-2 border-transparent rounded-3xl px-8 py-5 font-bold text-lg text-slate-800 focus:bg-white focus:border-blue-500/20 outline-none transition-all" value={patient.name} onChange={e => setPatient({...patient, name: e.target.value})} placeholder="..." />
               </div>
               <div className="space-y-4">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">{t.rmNo}</label>
-                <input className="w-full bg-slate-50 border-2 border-transparent rounded-3xl px-8 py-5 font-bold text-lg text-slate-800 focus:bg-white focus:border-blue-500/20 outline-none transition-all shadow-inner" value={patient.rmNo} onChange={e => setPatient({...patient, rmNo: e.target.value})} placeholder="RM-XXXX-XXXX" />
+                <input className="w-full bg-slate-50 border-2 border-transparent rounded-3xl px-8 py-5 font-bold text-lg text-slate-800 focus:bg-white focus:border-blue-500/20 outline-none transition-all" value={patient.rmNo} onChange={e => setPatient({...patient, rmNo: e.target.value})} placeholder="RM-XXXX" />
               </div>
               <div className="grid grid-cols-2 gap-8">
                 <div className="space-y-4">
@@ -319,14 +281,14 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                   <input type="date" className="w-full bg-slate-50 border-none rounded-3xl px-6 py-5 font-bold text-slate-800 outline-none" value={patient.dob} onChange={e => setPatient({...patient, dob: e.target.value})} />
                 </div>
                 <div className="space-y-4">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center block">Umur Kalkulasi</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center block">Umur</label>
                   <div className="w-full bg-blue-600 rounded-3xl px-6 py-5 font-black text-white text-center text-xl shadow-lg">{patient.age} Y</div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-8">
                 <div className="space-y-4">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">{t.gender}</label>
-                  <select className="w-full bg-slate-50 border-none rounded-3xl px-6 py-5 font-bold text-slate-800 outline-none cursor-pointer" value={patient.gender} onChange={e => setPatient({...patient, gender: e.target.value as any})}>
+                  <select className="w-full bg-slate-50 border-none rounded-3xl px-6 py-5 font-bold text-slate-800 outline-none" value={patient.gender} onChange={e => setPatient({...patient, gender: e.target.value as any})}>
                     <option value="Male">Laki-laki</option>
                     <option value="Female">Perempuan</option>
                     <option value="Other">Lainnya</option>
@@ -334,7 +296,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                 </div>
                 <div className="space-y-4">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">{t.bloodType}</label>
-                  <select className="w-full bg-slate-50 border-none rounded-3xl px-6 py-5 font-bold text-slate-800 outline-none cursor-pointer" value={patient.bloodType} onChange={e => setPatient({...patient, bloodType: e.target.value})}>
+                  <select className="w-full bg-slate-50 border-none rounded-3xl px-6 py-5 font-bold text-slate-800 outline-none" value={patient.bloodType} onChange={e => setPatient({...patient, bloodType: e.target.value})}>
                     {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(b => <option key={b} value={b}>{b}</option>)}
                   </select>
                 </div>
@@ -359,15 +321,15 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
               <div className="space-y-6">
                 <div className="space-y-3">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Activity size={12} className="text-blue-500" /> {t.complaints}</label>
-                  <textarea rows={4} className="w-full bg-slate-50 border-2 border-transparent rounded-[32px] p-6 text-lg font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500/20 transition-all shadow-inner" value={patient.complaints} onChange={e => setPatient({...patient, complaints: e.target.value})} placeholder="..." />
+                  <textarea rows={4} className="w-full bg-slate-50 border-2 border-transparent rounded-[32px] p-6 text-lg font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500/20 transition-all" value={patient.complaints} onChange={e => setPatient({...patient, complaints: e.target.value})} placeholder="..." />
                 </div>
                 <div className="space-y-3">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><History size={12} className="text-teal-500" /> {t.history}</label>
-                  <textarea rows={4} className="w-full bg-slate-50 border-2 border-transparent rounded-[32px] p-6 text-lg font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500/20 transition-all shadow-inner" value={patient.history} onChange={e => setPatient({...patient, history: e.target.value})} placeholder="..." />
+                  <textarea rows={4} className="w-full bg-slate-50 border-2 border-transparent rounded-[32px] p-6 text-lg font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500/20 transition-all" value={patient.history} onChange={e => setPatient({...patient, history: e.target.value})} placeholder="..." />
                 </div>
                 <div className="space-y-3">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Pill size={12} className="text-rose-500" /> {t.meds} & Alergi</label>
-                  <textarea rows={3} className="w-full bg-slate-50 border-2 border-transparent rounded-[32px] p-6 text-lg font-bold text-slate-800 outline-none focus:bg-white focus:border-rose-500/20 transition-all shadow-inner" value={patient.meds} onChange={e => setPatient({...patient, meds: e.target.value})} placeholder="..." />
+                  <textarea rows={3} className="w-full bg-slate-50 border-2 border-transparent rounded-[32px] p-6 text-lg font-bold text-slate-800 outline-none focus:bg-white focus:border-rose-500/20 transition-all" value={patient.meds} onChange={e => setPatient({...patient, meds: e.target.value})} placeholder="..." />
                 </div>
               </div>
             </div>
@@ -379,16 +341,14 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
               </div>
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { k: 'bpSystolic', l: 'Systolic', u: 'mmHg', r: '90-120', i: Heart, c: 'text-rose-500' },
-                  { k: 'bpDiastolic', l: 'Diastolic', u: 'mmHg', r: '60-80', i: Heart, c: 'text-rose-500' },
-                  { k: 'heartRate', l: 'Pulse', u: 'bpm', r: '60-100', i: Activity, c: 'text-blue-500' },
-                  { k: 'temperature', l: 'Temp', u: '°C', r: '36.5-37.5', i: Thermometer, c: 'text-orange-500' },
-                  { k: 'spo2', l: 'O2 Sat', u: '%', r: '95-100', i: Wind, c: 'text-teal-500' },
-                  { k: 'respiratoryRate', l: 'Resp', u: '/min', r: '12-20', i: Activity, c: 'text-indigo-500' },
-                  { k: 'weight', l: 'Weight', u: 'kg', r: 'Ref', i: Scale, c: 'text-slate-500' },
-                  { k: 'height', l: 'Height', u: 'cm', r: 'Ref', i: Scale, c: 'text-slate-500' }
+                  { k: 'bpSystolic', l: 'Systolic', u: 'mmHg', i: Heart, c: 'text-rose-500' },
+                  { k: 'bpDiastolic', l: 'Diastolic', u: 'mmHg', i: Heart, c: 'text-rose-500' },
+                  { k: 'heartRate', l: 'Pulse', u: 'bpm', i: Activity, c: 'text-blue-500' },
+                  { k: 'temperature', l: 'Temp', u: '°C', i: Thermometer, c: 'text-orange-500' },
+                  { k: 'spo2', l: 'O2 Sat', u: '%', i: Wind, c: 'text-teal-500' },
+                  { k: 'respiratoryRate', l: 'Resp', u: '/min', i: Activity, c: 'text-indigo-500' }
                 ].map(v => (
-                  <div key={v.k} className="bg-slate-50 p-5 rounded-[28px] group hover:bg-slate-100 transition-all">
+                  <div key={v.k} className="bg-slate-50 p-5 rounded-[28px] hover:bg-slate-100 transition-all">
                     <div className="flex justify-between items-start opacity-40 mb-1">
                       <v.i size={12} className={v.c} />
                       <span className="text-[8px] font-black uppercase">{v.u}</span>
@@ -399,8 +359,8 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                 ))}
               </div>
               <div className="pt-6 border-t border-slate-50 space-y-6">
-                <ChipGroup label={t.smokingHistory} value={patient.smoking} onChange={v => setPatient({...patient, smoking: v})} options={[{id:'None', label:t.none}, {id:'Passive', label:t.passive}, {id:'Active', label:t.active}]} />
-                <ChipGroup label={t.alcoholHistory} value={patient.alcohol} onChange={v => setPatient({...patient, alcohol: v})} options={[{id:'None', label:t.none}, {id:'Occasional', label:t.occasional}, {id:'Heavy', label:t.heavy}]} />
+                <ChipGroup label={t.smokingHistory} value={patient.smoking} onChange={(v:any) => setPatient({...patient, smoking: v})} options={[{id:'None', label:t.none}, {id:'Passive', label:t.passive}, {id:'Active', label:t.active}]} />
+                <ChipGroup label={t.alcoholHistory} value={patient.alcohol} onChange={(v:any) => setPatient({...patient, alcohol: v})} options={[{id:'None', label:t.none}, {id:'Occasional', label:t.occasional}, {id:'Heavy', label:t.heavy}]} />
               </div>
               <div className="flex justify-between pt-4">
                 <button onClick={() => setStep(1)} className="p-4 text-slate-400 hover:text-slate-800 transition-all"><ChevronLeft size={24}/></button>
@@ -419,18 +379,8 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
              </div>
              <div className="space-y-8">
                 <div className="bg-slate-900 p-10 rounded-[48px] text-white shadow-2xl relative overflow-hidden flex flex-col h-full min-h-[500px]">
-                   <div className="absolute top-0 right-0 p-10 opacity-5 pointer-events-none"><AlcortexLogo size={250} /></div>
-                   <div className="flex items-center gap-3 mb-8"><Stethoscope size={20} className="text-teal-400" /><h4 className="text-xl font-black tracking-tight uppercase">NEURAL ENGINE</h4></div>
-                   <p className="text-sm opacity-60 mb-10 leading-relaxed font-medium">Analyzing subjective history, lifestyle factors, vitals, and laboratory markers for multi-modal clinical synthesis.</p>
-                   
-                   <div className="flex-1 space-y-6">
-                      <div className="p-6 bg-white/5 rounded-3xl border border-white/10 space-y-4">
-                        <div className="flex justify-between text-[10px] font-black uppercase opacity-40"><span>System Check</span><span className="text-teal-400">Stable</span></div>
-                        <div className="flex justify-between text-[10px] font-black uppercase opacity-40"><span>Markers Synced</span><span>{patient.labBlood.length + patient.labUrine.length + patient.labSputum.length}</span></div>
-                      </div>
-                      {error && <div className="p-5 bg-rose-500/20 border border-rose-500/50 rounded-2xl text-[10px] font-bold text-rose-300 flex items-center gap-3"><XCircle size={14}/> {error}</div>}
-                   </div>
-
+                   <div className="flex items-center gap-3 mb-8"><Stethoscope size={20} className="text-teal-400" /><h4 className="text-xl font-black tracking-tight uppercase">AI DIAGNOSTIC ENGINE</h4></div>
+                   <p className="text-sm opacity-60 mb-10 leading-relaxed font-medium">Analyzing subjective history, lifestyle, vitals, and laboratories via OpenAI GPT-4o Synthesis.</p>
                    <button 
                     onClick={handleAnalyze} 
                     disabled={loading} 
@@ -448,20 +398,18 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
         {step === 4 && result && (
           <div className="space-y-10">
              <div className="bg-gradient-to-br from-blue-600 to-teal-500 p-10 rounded-[48px] shadow-2xl flex flex-col md:flex-row justify-between items-center gap-10 relative overflow-hidden text-white">
-                <div className="absolute top-0 right-0 p-20 opacity-10 pointer-events-none"><AlcortexLogo size={350} /></div>
                 <div className="flex flex-col md:flex-row items-center gap-10 relative z-10 text-center md:text-left">
-                   <div className="w-28 h-28 rounded-[40px] bg-white/10 backdrop-blur-md flex items-center justify-center text-white shadow-2xl border border-white/20"><AlcortexLogo size={60} /></div>
+                   <div className="w-28 h-28 rounded-[40px] bg-white/10 backdrop-blur-md flex items-center justify-center text-white border border-white/20"><AlcortexLogo size={60} /></div>
                    <div>
-                      <div className="flex items-center justify-center md:justify-start gap-3 mb-4"><span className="px-4 py-1 rounded-full bg-white/10 text-[9px] font-black text-white uppercase tracking-widest border border-white/20 backdrop-blur-sm">CERTI-MED AI ANALYSIS</span><span className="w-2 h-2 rounded-full bg-teal-300 animate-pulse"></span></div>
                       <h2 className="text-5xl font-black text-white tracking-tighter leading-tight mb-4">{result.mainDiagnosis}</h2>
                       <div className="flex flex-wrap justify-center md:justify-start gap-8">
                         <div className="flex items-center gap-2"><Activity size={16} className="text-teal-200" /><span className="text-[10px] font-black text-white/70 uppercase tracking-widest">Confidence: <span className="text-white">{(result.confidenceScore * 100).toFixed(0)}%</span></span></div>
-                        <div className="flex items-center gap-2"><ShieldAlert size={16} className="text-white/60" /><span className="text-[10px] font-black text-white/70 uppercase tracking-widest">Severity: <span className="text-white">{t[result.severity.toLowerCase()] || result.severity}</span></span></div>
+                        <div className="flex items-center gap-2"><ShieldAlert size={16} className="text-white/60" /><span className="text-[10px] font-black text-white/70 uppercase tracking-widest">Severity: <span className="text-white">{result.severity}</span></span></div>
                       </div>
                    </div>
                 </div>
-                <button onClick={exportPDF} className="bg-white text-blue-600 p-10 rounded-[40px] shadow-2xl hover:scale-110 transition-all relative z-10 group border border-white/20 active:scale-95">
-                  <Download size={40} className="group-hover:translate-y-1 transition-transform" />
+                <button onClick={exportPDF} className="bg-white text-blue-600 p-10 rounded-[40px] shadow-2xl hover:scale-110 transition-all relative z-10">
+                  <Download size={40} />
                 </button>
              </div>
              
@@ -473,11 +421,11 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-10 border-t border-slate-50">
                       <div className="space-y-4">
                         <h5 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Management Protocol</h5>
-                        <div className="bg-blue-50/50 p-6 rounded-3xl text-sm font-bold text-slate-700 leading-relaxed">{result.followUp}</div>
+                        <div className="bg-blue-50/50 p-6 rounded-3xl text-sm font-bold text-slate-700">{result.followUp}</div>
                       </div>
                       <div className="space-y-4">
                         <h5 className="text-[10px] font-black text-teal-600 uppercase tracking-widest">Therapeutics</h5>
-                        <div className="bg-teal-50/50 p-6 rounded-3xl text-sm font-bold text-slate-700 leading-relaxed">{result.medicationRecs}</div>
+                        <div className="bg-teal-50/50 p-6 rounded-3xl text-sm font-bold text-slate-700">{result.medicationRecs}</div>
                       </div>
                    </div>
                 </div>
@@ -487,18 +435,14 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                       <h4 className="font-black text-[10px] opacity-40 uppercase tracking-widest mb-8">Differential Stack</h4>
                       <div className="space-y-5">
                         {result.differentials.map((d, i) => (
-                          <div key={i} className="p-6 bg-white/5 rounded-[32px] border border-white/10 group hover:bg-white/10 transition-all">
+                          <div key={i} className="p-6 bg-white/5 rounded-[32px] border border-white/10">
                              <div className="flex justify-between items-center mb-1"><span className="text-[9px] font-black text-teal-400 uppercase tracking-widest">{d.icd10}</span><span className="text-teal-400 font-black text-sm">{(d.confidence * 100).toFixed(0)}%</span></div>
                              <p className="font-black text-md leading-tight">{d.diagnosis}</p>
                           </div>
                         ))}
                       </div>
                    </div>
-                   <div className="bg-rose-50 p-8 rounded-[40px] border border-rose-100 flex gap-6 items-start">
-                      <ShieldAlert size={32} className="text-rose-500 shrink-0" />
-                      <div><h5 className="text-[10px] font-black text-rose-800 uppercase tracking-widest mb-2">Safety Protocol</h5><p className="text-xs text-rose-700 font-bold leading-relaxed">{result.safetyWarning}</p></div>
-                   </div>
-                   <button onClick={() => setStep(1)} className="w-full bg-slate-100 text-slate-400 py-6 rounded-3xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-900 hover:text-white transition-all shadow-inner">Start New Session</button>
+                   <button onClick={() => setStep(1)} className="w-full bg-slate-100 text-slate-400 py-6 rounded-3xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-900 hover:text-white transition-all">Sesi Baru</button>
                 </div>
              </div>
           </div>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   User as UserIcon, 
@@ -10,18 +11,21 @@ import {
   ChevronRight,
   ChevronLeft,
   Pill,
-  ClipboardList,
-  Thermometer,
+  IdCard,
   Heart,
   Wind,
   Droplets,
   Scale,
-  MoveVertical,
-  Save,
-  XCircle
+  Stethoscope,
+  Calendar,
+  CheckCircle2,
+  FileText,
+  Thermometer,
+  XCircle,
+  Zap
 } from 'lucide-react';
 import LabInput from '../components/LabInput';
-import { PatientData, DiagnosisOutput, LabResult, User, SavedRecord } from '../types';
+import { PatientData, DiagnosisOutput, User, SavedRecord, Vitals } from '../types';
 import { translations } from '../translations';
 import { analyzePatientData } from '../services/geminiService';
 import { jsPDF } from 'jspdf';
@@ -57,89 +61,65 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
     activity: 'Moderate',
     complaints: '',
     vitals: {
-      bpSystolic: '',
-      bpDiastolic: '',
-      heartRate: '',
-      respiratoryRate: '',
-      temperature: '',
-      spo2: '',
-      weight: '',
-      height: ''
+      bpSystolic: '', bpDiastolic: '', heartRate: '', respiratoryRate: '',
+      temperature: '', spo2: '', weight: '', height: ''
     },
-    labBlood: [
-      { parameter: 'Hemoglobin', value: '', unit: 'g/dL', referenceRange: '13.5-17.5' },
-      { parameter: 'Leukocytes (WBC)', value: '', unit: '10^3/uL', referenceRange: '4.5-11.0' },
-      { parameter: 'Platelets', value: '', unit: '10^3/uL', referenceRange: '150-450' }
-    ],
-    labUrine: [
-      { parameter: 'Specific Gravity', value: '', unit: '-', referenceRange: '1.005-1.030' },
-      { parameter: 'Protein', value: '', unit: '-', referenceRange: 'Negative' }
-    ],
-    labSputum: [
-      { parameter: 'AFB', value: '', unit: '-', referenceRange: 'Negative' },
-      { parameter: 'Gram Stain', value: '', unit: '-', referenceRange: '-' }
-    ]
+    labBlood: [], labUrine: [], labSputum: []
   });
 
   useEffect(() => {
     const draft = localStorage.getItem('alcortex_patient_draft');
     if (draft) {
       try {
-        const parsedDraft = JSON.parse(draft);
-        setPatient(parsedDraft);
-      } catch (e) {
-        console.error("Failed to load patient draft", e);
-      }
+        const parsed = JSON.parse(draft);
+        setPatient(parsed);
+      } catch (e) { console.error(e); }
     }
   }, []);
 
   useEffect(() => {
-    const saveTimeout = setTimeout(() => {
-      if (patient.name || patient.complaints || patient.history || patient.rmNo) {
+    const timer = setTimeout(() => {
+      if (patient.name || patient.complaints) {
         localStorage.setItem('alcortex_patient_draft', JSON.stringify(patient));
         setIsDraftSaved(true);
-        const feedbackTimeout = setTimeout(() => setIsDraftSaved(false), 2000);
-        return () => clearTimeout(feedbackTimeout);
+        setTimeout(() => setIsDraftSaved(false), 2000);
       }
     }, 2000);
-
-    return () => clearTimeout(saveTimeout);
+    return () => clearTimeout(timer);
   }, [patient]);
 
   useEffect(() => {
     if (patient.dob) {
       const birthDate = new Date(patient.dob);
       const today = new Date();
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const m = today.getMonth() - birthDate.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
+      if (!isNaN(birthDate.getTime())) {
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+        setPatient(prev => ({ ...prev, age: age >= 0 ? age : 0 }));
       }
-      setPatient(prev => ({ ...prev, age: age > 0 ? age : 0 }));
     }
   }, [patient.dob]);
+
+  const handleVitalChange = (key: keyof Vitals, value: string) => {
+    const isDecimal = ['temperature', 'weight', 'height'].includes(key);
+    const regex = isDecimal ? /^[0-9]*\.?[0-9]*$/ : /^[0-9]*$/;
+    if (value === '' || regex.test(value)) {
+      setPatient(prev => ({ ...prev, vitals: { ...prev.vitals, [key]: value } }));
+    }
+  };
 
   const handleAnalyze = async () => {
     setLoading(true);
     setError(null);
-
     try {
       const analysis = await analyzePatientData(patient, user.language);
       setResult(analysis);
-      
-      await onSaveRecord({
-        id: 'REC-' + Date.now(),
-        date: new Date().toISOString(),
-        patient: { ...patient },
-        analysis
-      });
-
+      await onSaveRecord({ id: 'ALCOR-' + Date.now(), date: new Date().toISOString(), patient: JSON.parse(JSON.stringify(patient)), analysis });
       localStorage.removeItem('alcortex_patient_draft');
       setStep(4);
     } catch (err: any) {
-      console.error(err);
-      // Fix: Follow guidelines which prohibit manual API key prompts for text models.
-      setError("Analisis gagal. " + (err.message || "Terjadi kesalahan sistem."));
+      setError("AI Engine Error: " + (err.message || "Unknown error"));
     } finally {
       setLoading(false);
     }
@@ -148,31 +128,125 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
   const exportPDF = () => {
     if (!result) return;
     const doc = new jsPDF();
-    doc.setFillColor(37, 99, 235);
-    doc.rect(0, 0, 210, 45, 'F');
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFillColor(15, 23, 42); 
+    doc.rect(0, 0, pageWidth, 50, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(26);
-    doc.text('ALCORTEX AI', 20, 28);
+    doc.setFontSize(28);
+    doc.setFont("helvetica", "bold");
+    doc.text('ALCORTEX AI', 20, 22);
     doc.setFontSize(10);
-    doc.text(t.reportTitle || 'PRECISION CLINICAL DIAGNOSTIC REPORT', 20, 38);
-    
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(45, 212, 191);
+    doc.text(t.reportSubtitle || 'PRECISION CLINICAL DIAGNOSTIC SUITE', 20, 32);
+    doc.setTextColor(255, 255, 255);
+    doc.text(`REPORT ID: ${patient.rmNo}-${Date.now().toString().slice(-6)}`, pageWidth - 20, 22, { align: 'right' });
+    doc.text(`DATE: ${new Date().toLocaleString()}`, pageWidth - 20, 30, { align: 'right' });
+
+    // Patient Profile
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(14);
+    doc.text('I. PATIENT PROFILE', 20, 65);
+    autoTable(doc, {
+      startY: 70,
+      theme: 'grid',
+      body: [
+        ['Name:', patient.name.toUpperCase(), 'RM Number:', patient.rmNo],
+        ['Age:', `${patient.age} Y`, 'Gender:', patient.gender],
+        ['Blood Type:', patient.bloodType, 'DOB:', patient.dob]
+      ],
+      styles: { fontSize: 8 },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 30 }, 2: { fontStyle: 'bold', cellWidth: 30 } }
+    });
+
+    // Subjective Data
+    doc.text('II. CLINICAL NARRATIVES', 20, (doc as any).lastAutoTable.finalY + 15);
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      theme: 'grid',
+      body: [
+        ['Main Complaints:', patient.complaints || '-'],
+        ['Medical History:', patient.history || '-'],
+        ['Meds & Allergies:', `${patient.meds} / ${patient.allergies}`]
+      ],
+      styles: { fontSize: 8 },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 40 } }
+    });
+
+    // Vitals & Lifestyle
+    doc.text('III. VITALS & LIFESTYLE', 20, (doc as any).lastAutoTable.finalY + 15);
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      theme: 'grid',
+      head: [['BP', 'HR', 'Temp', 'SpO2', 'RR', 'Weight', 'Smoking', 'Alcohol']],
+      body: [[
+        `${patient.vitals.bpSystolic}/${patient.vitals.bpDiastolic}`,
+        patient.vitals.heartRate,
+        `${patient.vitals.temperature}°C`,
+        `${patient.vitals.spo2}%`,
+        patient.vitals.respiratoryRate,
+        `${patient.vitals.weight}kg`,
+        patient.smoking,
+        patient.alcohol
+      ]],
+      styles: { fontSize: 8, halign: 'center' },
+      headStyles: { fillColor: [51, 65, 85] }
+    });
+
+    // Labs (Modular Tables)
+    const renderLab = (title: string, data: any[]) => {
+      if (data.length === 0) return;
+      doc.setFontSize(14);
+      doc.text(title, 20, (doc as any).lastAutoTable.finalY + 15);
+      autoTable(doc, {
+        startY: (doc as any).lastAutoTable.finalY + 20,
+        theme: 'striped',
+        head: [['Parameter', 'Result', 'Unit', 'Ref. Range']],
+        body: data.map(r => [r.parameter, r.value, r.unit, r.referenceRange]),
+        styles: { fontSize: 8 }
+      });
+    };
+
+    renderLab(`IV. BLOOD PANEL RESULTS`, patient.labBlood);
+    renderLab(`V. URINE ANALYSIS RESULTS`, patient.labUrine);
+    renderLab(`VI. SPUTUM ANALYSIS RESULTS`, patient.labSputum);
+
+    // AI Analysis Panel
+    doc.setFillColor(37, 99, 235);
+    doc.rect(20, (doc as any).lastAutoTable.finalY + 10, pageWidth - 40, 30, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.text('PRIMARY AI DIAGNOSIS:', 25, (doc as any).lastAutoTable.finalY + 20);
+    doc.setFontSize(18);
+    doc.text(result.mainDiagnosis.toUpperCase(), 25, (doc as any).lastAutoTable.finalY + 32);
+
+    // Differential & Plan
+    doc.setTextColor(15, 23, 42);
     doc.setFontSize(12);
-    doc.text(`Patient: ${patient.name}`, 20, 60);
-    doc.text(`Diagnosis: ${result.mainDiagnosis}`, 20, 70);
-    doc.text(`Severity: ${result.severity}`, 20, 80);
-    
-    doc.save(`Alcortex_Report_${patient.rmNo}.pdf`);
+    doc.text('DIAGNOSTIC PLAN & INTERPRETATION', 20, (doc as any).lastAutoTable.finalY + 50);
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 55,
+      theme: 'plain',
+      body: [
+        ['Interpretation:', result.interpretation],
+        ['Differentials:', result.differentials.map(d => `${d.icd10} ${d.diagnosis} (${(d.confidence*100).toFixed(0)}%)`).join('\n')],
+        ['Action Plan:', result.followUp],
+        ['Therapeutics:', result.medicationRecs]
+      ],
+      styles: { fontSize: 8 },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 40 } }
+    });
+
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.text(t.pdfFooter, pageWidth / 2, doc.internal.pageSize.getHeight() - 15, { align: 'center' });
+
+    doc.save(`Alcortex_Clinical_Report_${patient.rmNo}.pdf`);
   };
 
-  const steps = [
-    { id: 1, label: t.profile, icon: UserIcon },
-    { id: 2, label: t.history, icon: History },
-    { id: 3, label: t.lab, icon: Microscope },
-    { id: 4, label: t.intelligence, component: <AlcortexLogo size={22} /> },
-  ];
-
-  const ChipGroup = ({ label, options, value, onChange }: { label: string, options: { id: string, label: string, color: string }[] , value: string, onChange: (id: any) => void }) => (
+  const ChipGroup = ({ label, options, value, onChange }: { label: string, options: any[], value: string, onChange: (v: any) => void }) => (
     <div className="space-y-3">
       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
       <div className="flex flex-wrap gap-2">
@@ -181,10 +255,8 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
             key={opt.id}
             type="button"
             onClick={() => onChange(opt.id)}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold border-2 transition-all ${
-              value === opt.id 
-                ? `${opt.color} text-white border-transparent shadow-lg` 
-                : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'
+            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all border-2 ${
+              value === opt.id ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'
             }`}
           >
             {opt.label}
@@ -195,177 +267,238 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
   );
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-20">
-      <div className="bg-white p-4 rounded-[40px] border border-slate-100 shadow-sm relative overflow-hidden flex justify-between items-center px-10">
-        <div className="absolute top-0 left-0 w-full h-1 bg-slate-50">
-          <div 
-            className="h-full bg-gradient-to-r from-blue-600 to-teal-400 transition-all duration-700 ease-out" 
-            style={{ width: `${(step / steps.length) * 100}%` }}
-          />
+    <div className="max-w-7xl mx-auto space-y-8 pb-32">
+      {/* Visual Stepper */}
+      <div className="bg-white p-4 rounded-[32px] border border-slate-100 shadow-sm flex justify-between items-center px-10 relative overflow-hidden">
+        <div className="absolute top-0 left-0 h-1 bg-slate-50 w-full">
+           <div className="h-full bg-gradient-to-r from-blue-600 to-teal-500 transition-all duration-700" style={{ width: `${(step/4)*100}%` }}></div>
         </div>
-        {steps.map((s) => (
-          <button 
-            key={s.id}
-            onClick={() => s.id <= step || result ? setStep(s.id) : null}
-            className={`flex flex-col items-center gap-3 py-4 transition-all ${
-              step === s.id ? 'scale-110' : 'opacity-40 grayscale hover:grayscale-0 hover:opacity-100'
-            }`}
-          >
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
-               step === s.id ? 'bg-gradient-to-br from-blue-600 to-teal-400 text-white shadow-xl shadow-blue-500/20' : 'bg-slate-50 text-slate-400'
-            }`}>
-              {s.icon ? <s.icon size={22} /> : s.component}
+        {[
+          { id: 1, label: t.profile, icon: IdCard },
+          { id: 2, label: t.history, icon: History },
+          { id: 3, label: t.lab, icon: Microscope },
+          { id: 4, label: t.intelligence, icon: Stethoscope }
+        ].map(s => (
+          <div key={s.id} className={`flex flex-col items-center gap-2 transition-all ${step === s.id ? 'opacity-100 scale-105' : 'opacity-25'}`}>
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${step === s.id ? 'bg-gradient-to-br from-blue-600 to-teal-500 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-50 text-slate-400'}`}>
+              <s.icon size={20} />
             </div>
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-800">{s.label}</span>
-          </button>
+            <span className="text-[9px] font-black uppercase tracking-widest">{s.label}</span>
+          </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-8">
+      <div className="animate-fade-in">
         {step === 1 && (
-          <div className="bg-white p-12 rounded-[48px] border border-slate-100 shadow-sm space-y-10 animate-fade-in">
-            <h3 className="text-3xl font-black text-slate-800">{t.profile}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.patientName}</label>
-                  <input 
-                    className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 focus:ring-4 focus:ring-blue-500/5 text-slate-700 font-bold"
-                    placeholder="John Doe"
-                    value={patient.name}
-                    onChange={e => setPatient({...patient, name: e.target.value})}
-                  />
+          <div className="bg-white p-12 rounded-[40px] border border-slate-100 shadow-xl space-y-10">
+            <div className="flex justify-between items-center border-b border-slate-50 pb-6">
+               <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-500/20">
+                    <UserIcon size={28} />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-800 tracking-tight">{t.profile} Pasien</h3>
+                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Clinical Demographics Initialization</p>
+                  </div>
+               </div>
+               {isDraftSaved && <span className="px-4 py-2 bg-teal-50 text-teal-600 text-[10px] font-black rounded-xl animate-pulse">Draft Tersimpan</span>}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">{t.patientName}</label>
+                <input className="w-full bg-slate-50 border-2 border-transparent rounded-3xl px-8 py-5 font-bold text-lg text-slate-800 focus:bg-white focus:border-blue-500/20 outline-none transition-all shadow-inner" value={patient.name} onChange={e => setPatient({...patient, name: e.target.value})} placeholder="..." />
+              </div>
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">{t.rmNo}</label>
+                <input className="w-full bg-slate-50 border-2 border-transparent rounded-3xl px-8 py-5 font-bold text-lg text-slate-800 focus:bg-white focus:border-blue-500/20 outline-none transition-all shadow-inner" value={patient.rmNo} onChange={e => setPatient({...patient, rmNo: e.target.value})} placeholder="RM-XXXX-XXXX" />
+              </div>
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Tanggal Lahir</label>
+                  <input type="date" className="w-full bg-slate-50 border-none rounded-3xl px-6 py-5 font-bold text-slate-800 outline-none" value={patient.dob} onChange={e => setPatient({...patient, dob: e.target.value})} />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.rmNo}</label>
-                    <input 
-                      className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 focus:ring-4 focus:ring-blue-500/5 text-slate-700 font-bold"
-                      placeholder="RM-XXXX"
-                      value={patient.rmNo}
-                      onChange={e => setPatient({...patient, rmNo: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.bloodType}</label>
-                    <select 
-                      className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 font-bold"
-                      value={patient.bloodType}
-                      onChange={e => setPatient({...patient, bloodType: e.target.value})}
-                    >
-                      {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bt => <option key={bt} value={bt}>{bt}</option>)}
-                    </select>
-                  </div>
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center block">Umur Kalkulasi</label>
+                  <div className="w-full bg-blue-600 rounded-3xl px-6 py-5 font-black text-white text-center text-xl shadow-lg">{patient.age} Y</div>
                 </div>
               </div>
-              <div className="space-y-6">
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">DOB</label>
-                      <input type="date" className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 text-slate-700" value={patient.dob} onChange={e => setPatient({...patient, dob: e.target.value})} />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.age}</label>
-                      <input readOnly className="w-full bg-slate-100 border-none rounded-2xl px-6 py-5 text-center font-bold text-blue-600" value={patient.age} />
-                    </div>
-                 </div>
-                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.gender}</label>
-                  <select className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 font-bold" value={patient.gender} onChange={e => setPatient({...patient, gender: e.target.value as any})}>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">{t.gender}</label>
+                  <select className="w-full bg-slate-50 border-none rounded-3xl px-6 py-5 font-bold text-slate-800 outline-none cursor-pointer" value={patient.gender} onChange={e => setPatient({...patient, gender: e.target.value as any})}>
+                    <option value="Male">Laki-laki</option>
+                    <option value="Female">Perempuan</option>
+                    <option value="Other">Lainnya</option>
+                  </select>
+                </div>
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">{t.bloodType}</label>
+                  <select className="w-full bg-slate-50 border-none rounded-3xl px-6 py-5 font-bold text-slate-800 outline-none cursor-pointer" value={patient.bloodType} onChange={e => setPatient({...patient, bloodType: e.target.value})}>
+                    {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(b => <option key={b} value={b}>{b}</option>)}
                   </select>
                 </div>
               </div>
             </div>
-            <div className="flex justify-end pt-10 border-t">
-              <button onClick={() => setStep(2)} className="bg-gradient-to-r from-blue-600 to-teal-500 text-white px-12 py-5 rounded-2xl font-black uppercase tracking-widest flex items-center gap-3 shadow-xl shadow-blue-500/10">
-                 {t.historyExplorer} <ChevronRight size={20} />
+
+            <div className="flex justify-end pt-8">
+              <button onClick={() => setStep(2)} className="bg-slate-900 text-white px-16 py-6 rounded-3xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-blue-600 transition-all flex items-center gap-4 group">
+                {t.next} <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
           </div>
         )}
 
         {step === 2 && (
-          <div className="bg-white p-12 rounded-[48px] border border-slate-100 shadow-sm space-y-10 animate-fade-in">
-             <div className="flex justify-between items-end">
-                <h3 className="text-3xl font-black text-slate-800">{t.historyExplorer}</h3>
-             </div>
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.complaints}</label>
-                  <textarea rows={4} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 font-medium text-slate-700" value={patient.complaints} onChange={e => setPatient({...patient, complaints: e.target.value})} />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-7 bg-white p-10 rounded-[48px] shadow-xl border border-slate-100 space-y-8">
+              <div className="flex items-center gap-4 border-b border-slate-50 pb-6">
+                <div className="p-3 bg-blue-50 rounded-xl text-blue-600"><History size={24} /></div>
+                <h3 className="text-xl font-black text-slate-800 tracking-tight">{t.historyExplorer}</h3>
+              </div>
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Activity size={12} className="text-blue-500" /> {t.complaints}</label>
+                  <textarea rows={4} className="w-full bg-slate-50 border-2 border-transparent rounded-[32px] p-6 text-lg font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500/20 transition-all shadow-inner" value={patient.complaints} onChange={e => setPatient({...patient, complaints: e.target.value})} placeholder="..." />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.history}</label>
-                  <textarea rows={4} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 font-medium text-slate-700" value={patient.history} onChange={e => setPatient({...patient, history: e.target.value})} />
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><History size={12} className="text-teal-500" /> {t.history}</label>
+                  <textarea rows={4} className="w-full bg-slate-50 border-2 border-transparent rounded-[32px] p-6 text-lg font-bold text-slate-800 outline-none focus:bg-white focus:border-teal-500/20 transition-all shadow-inner" value={patient.history} onChange={e => setPatient({...patient, history: e.target.value})} placeholder="..." />
                 </div>
-             </div>
-             <div className="flex justify-between pt-10 border-t">
-                <button onClick={() => setStep(1)} className="text-slate-400 font-bold px-8 flex items-center gap-2 hover:text-slate-600 transition-colors"><ChevronLeft /> {t.back}</button>
-                <button onClick={() => setStep(3)} className="bg-gradient-to-r from-blue-600 to-teal-500 text-white px-12 py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-blue-500/10">{t.next}</button>
-             </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Pill size={12} className="text-rose-500" /> {t.meds} & Alergi</label>
+                  <textarea rows={3} className="w-full bg-slate-50 border-2 border-transparent rounded-[32px] p-6 text-lg font-bold text-slate-800 outline-none focus:bg-white focus:border-rose-500/20 transition-all shadow-inner" value={patient.meds} onChange={e => setPatient({...patient, meds: e.target.value})} placeholder="..." />
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-5 bg-white p-10 rounded-[48px] shadow-xl border border-slate-100 space-y-8">
+              <div className="flex items-center gap-4 border-b border-slate-50 pb-6">
+                <div className="p-3 bg-rose-50 rounded-xl text-rose-500"><Activity size={24} /></div>
+                <h3 className="text-xl font-black text-slate-800 tracking-tight">{t.vitals} Grid</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { k: 'bpSystolic', l: 'Systolic', u: 'mmHg', r: '90-120', i: Heart, c: 'text-rose-500' },
+                  { k: 'bpDiastolic', l: 'Diastolic', u: 'mmHg', r: '60-80', i: Heart, c: 'text-rose-500' },
+                  { k: 'heartRate', l: 'Pulse', u: 'bpm', r: '60-100', i: Activity, c: 'text-blue-500' },
+                  { k: 'temperature', l: 'Temp', u: '°C', r: '36.5-37.5', i: Thermometer, c: 'text-orange-500' },
+                  { k: 'spo2', l: 'O2 Sat', u: '%', r: '95-100', i: Wind, c: 'text-teal-500' },
+                  { k: 'respiratoryRate', l: 'Resp', u: '/min', r: '12-20', i: Activity, c: 'text-indigo-500' },
+                  { k: 'weight', l: 'Weight', u: 'kg', r: 'Ref', i: Scale, c: 'text-slate-500' },
+                  { k: 'height', l: 'Height', u: 'cm', r: 'Ref', i: Scale, c: 'text-slate-500' }
+                ].map(v => (
+                  <div key={v.k} className="bg-slate-50 p-5 rounded-[28px] group hover:bg-slate-100 transition-all">
+                    <div className="flex justify-between items-start opacity-40 mb-1">
+                      <v.i size={12} className={v.c} />
+                      <span className="text-[8px] font-black uppercase">{v.u}</span>
+                    </div>
+                    <input className="w-full bg-transparent p-0 text-xl font-black text-slate-800 outline-none" value={(patient.vitals as any)[v.k]} onChange={e => handleVitalChange(v.k as any, e.target.value)} placeholder="0" />
+                    <p className="text-[8px] font-black text-slate-400 uppercase mt-1">{v.l}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="pt-6 border-t border-slate-50 space-y-6">
+                <ChipGroup label={t.smokingHistory} value={patient.smoking} onChange={v => setPatient({...patient, smoking: v})} options={[{id:'None', label:t.none}, {id:'Passive', label:t.passive}, {id:'Active', label:t.active}]} />
+                <ChipGroup label={t.alcoholHistory} value={patient.alcohol} onChange={v => setPatient({...patient, alcohol: v})} options={[{id:'None', label:t.none}, {id:'Occasional', label:t.occasional}, {id:'Heavy', label:t.heavy}]} />
+              </div>
+              <div className="flex justify-between pt-4">
+                <button onClick={() => setStep(1)} className="p-4 text-slate-400 hover:text-slate-800 transition-all"><ChevronLeft size={24}/></button>
+                <button onClick={() => setStep(3)} className="bg-blue-600 text-white px-12 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg">{t.next} LABS</button>
+              </div>
+            </div>
           </div>
         )}
 
         {step === 3 && (
-           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-fade-in">
-              <div className="space-y-8 max-h-[700px] overflow-y-auto pr-4 custom-scrollbar">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+             <div className="lg:col-span-2 space-y-8">
                 <LabInput title={t.blood} results={patient.labBlood} setResults={v => setPatient({...patient, labBlood: v})} />
                 <LabInput title={t.urine} results={patient.labUrine} setResults={v => setPatient({...patient, labUrine: v})} />
-              </div>
-              <div className="bg-gradient-to-br from-blue-800 to-teal-900 rounded-[48px] p-12 text-white shadow-2xl relative overflow-hidden flex flex-col justify-center">
-                 <h3 className="text-4xl font-black tracking-tight mb-8">{t.intelligence} Core</h3>
-                 
-                 {error && (
-                   <div className="bg-rose-500/20 border border-rose-500/50 p-6 rounded-[32px] space-y-4 mb-6">
-                     <div className="flex items-start gap-3">
-                       <XCircle size={20} className="text-rose-400 shrink-0 mt-0.5" />
-                       <p className="text-sm font-bold text-rose-100 leading-relaxed">{error}</p>
-                     </div>
+                <LabInput title={t.sputum} results={patient.labSputum} setResults={v => setPatient({...patient, labSputum: v})} />
+             </div>
+             <div className="space-y-8">
+                <div className="bg-slate-900 p-10 rounded-[48px] text-white shadow-2xl relative overflow-hidden flex flex-col h-full min-h-[500px]">
+                   <div className="absolute top-0 right-0 p-10 opacity-5 pointer-events-none"><AlcortexLogo size={250} /></div>
+                   <div className="flex items-center gap-3 mb-8"><Stethoscope size={20} className="text-teal-400" /><h4 className="text-xl font-black tracking-tight uppercase">NEURAL ENGINE</h4></div>
+                   <p className="text-sm opacity-60 mb-10 leading-relaxed font-medium">Analyzing subjective history, lifestyle factors, vitals, and laboratory markers for multi-modal clinical synthesis.</p>
+                   
+                   <div className="flex-1 space-y-6">
+                      <div className="p-6 bg-white/5 rounded-3xl border border-white/10 space-y-4">
+                        <div className="flex justify-between text-[10px] font-black uppercase opacity-40"><span>System Check</span><span className="text-teal-400">Stable</span></div>
+                        <div className="flex justify-between text-[10px] font-black uppercase opacity-40"><span>Markers Synced</span><span>{patient.labBlood.length + patient.labUrine.length + patient.labSputum.length}</span></div>
+                      </div>
+                      {error && <div className="p-5 bg-rose-500/20 border border-rose-500/50 rounded-2xl text-[10px] font-bold text-rose-300 flex items-center gap-3"><XCircle size={14}/> {error}</div>}
                    </div>
-                 )}
 
-                 <button 
-                   onClick={handleAnalyze}
-                   disabled={loading}
-                   className="w-full bg-gradient-to-r from-blue-500 to-teal-400 py-6 rounded-3xl font-black text-xl flex items-center justify-center gap-4 hover:shadow-2xl transition-all disabled:opacity-50"
-                 >
-                   {loading ? <Loader2 className="animate-spin" /> : <AlcortexLogo size={24} />}
-                   {loading ? t.neuralAnalyzing : t.analyze}
-                 </button>
-              </div>
-           </div>
+                   <button 
+                    onClick={handleAnalyze} 
+                    disabled={loading} 
+                    className="w-full bg-gradient-to-r from-blue-600 to-teal-500 py-6 rounded-3xl font-black uppercase text-xs tracking-[0.3em] flex items-center justify-center gap-4 shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 mt-10"
+                   >
+                     {loading ? <Loader2 className="animate-spin" /> : <Zap size={18} fill="currentColor" />}
+                     {loading ? 'PROCESSING...' : t.analyze}
+                   </button>
+                   <button onClick={() => setStep(2)} className="w-full py-4 text-[10px] font-black uppercase tracking-widest opacity-30 hover:opacity-100 transition-all">{t.back}</button>
+                </div>
+             </div>
+          </div>
         )}
 
         {step === 4 && result && (
-          <div className="space-y-10 animate-fade-in">
-             <div className="bg-white p-12 rounded-[48px] shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-8">
-                <div>
-                   <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 block mb-2">{t.mainDiagnosis}</span>
-                   <h2 className="text-5xl font-black text-slate-800">{result.mainDiagnosis}</h2>
+          <div className="space-y-10">
+             <div className="bg-gradient-to-br from-blue-600 to-teal-500 p-10 rounded-[48px] shadow-2xl flex flex-col md:flex-row justify-between items-center gap-10 relative overflow-hidden text-white">
+                <div className="absolute top-0 right-0 p-20 opacity-10 pointer-events-none"><AlcortexLogo size={350} /></div>
+                <div className="flex flex-col md:flex-row items-center gap-10 relative z-10 text-center md:text-left">
+                   <div className="w-28 h-28 rounded-[40px] bg-white/10 backdrop-blur-md flex items-center justify-center text-white shadow-2xl border border-white/20"><AlcortexLogo size={60} /></div>
+                   <div>
+                      <div className="flex items-center justify-center md:justify-start gap-3 mb-4"><span className="px-4 py-1 rounded-full bg-white/10 text-[9px] font-black text-white uppercase tracking-widest border border-white/20 backdrop-blur-sm">CERTI-MED AI ANALYSIS</span><span className="w-2 h-2 rounded-full bg-teal-300 animate-pulse"></span></div>
+                      <h2 className="text-5xl font-black text-white tracking-tighter leading-tight mb-4">{result.mainDiagnosis}</h2>
+                      <div className="flex flex-wrap justify-center md:justify-start gap-8">
+                        <div className="flex items-center gap-2"><Activity size={16} className="text-teal-200" /><span className="text-[10px] font-black text-white/70 uppercase tracking-widest">Confidence: <span className="text-white">{(result.confidenceScore * 100).toFixed(0)}%</span></span></div>
+                        <div className="flex items-center gap-2"><ShieldAlert size={16} className="text-white/60" /><span className="text-[10px] font-black text-white/70 uppercase tracking-widest">Severity: <span className="text-white">{t[result.severity.toLowerCase()] || result.severity}</span></span></div>
+                      </div>
+                   </div>
                 </div>
-                <button onClick={exportPDF} className="bg-blue-600 text-white p-6 rounded-3xl shadow-xl hover:scale-105 transition-all">
-                  <Download size={32} />
+                <button onClick={exportPDF} className="bg-white text-blue-600 p-10 rounded-[40px] shadow-2xl hover:scale-110 transition-all relative z-10 group border border-white/20 active:scale-95">
+                  <Download size={40} className="group-hover:translate-y-1 transition-transform" />
                 </button>
              </div>
              
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100">
-                  <h4 className="font-black text-slate-800 mb-6 uppercase tracking-widest text-xs">{t.interpretation}</h4>
-                  <p className="text-slate-500 leading-relaxed font-medium">{result.interpretation}</p>
-                </div>
-                <div className="bg-slate-900 p-10 rounded-[40px] text-white shadow-2xl">
-                  <h4 className="font-bold mb-6 text-sm opacity-60 uppercase tracking-widest">{t.differentialDiagnostics}</h4>
-                  <div className="space-y-4">
-                    {result.differentials.map((d, i) => (
-                      <div key={i} className="p-4 bg-white/5 rounded-2xl border border-white/10 flex justify-between">
-                        <span className="font-bold">{d.diagnosis}</span>
-                        <span className="text-teal-400 font-black">{(d.confidence * 100).toFixed(0)}%</span>
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                <div className="lg:col-span-2 bg-white p-12 rounded-[48px] shadow-xl border border-slate-100 space-y-10">
+                   <div className="flex items-center gap-4"><FileText size={24} className="text-blue-600"/><h4 className="font-black text-xl text-slate-800 uppercase tracking-tight">{t.interpretation}</h4></div>
+                   <p className="text-slate-600 leading-relaxed text-xl font-medium whitespace-pre-wrap">{result.interpretation}</p>
+                   
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-10 border-t border-slate-50">
+                      <div className="space-y-4">
+                        <h5 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Management Protocol</h5>
+                        <div className="bg-blue-50/50 p-6 rounded-3xl text-sm font-bold text-slate-700 leading-relaxed">{result.followUp}</div>
                       </div>
-                    ))}
-                  </div>
+                      <div className="space-y-4">
+                        <h5 className="text-[10px] font-black text-teal-600 uppercase tracking-widest">Therapeutics</h5>
+                        <div className="bg-teal-50/50 p-6 rounded-3xl text-sm font-bold text-slate-700 leading-relaxed">{result.medicationRecs}</div>
+                      </div>
+                   </div>
+                </div>
+
+                <div className="space-y-8">
+                   <div className="bg-slate-900 p-10 rounded-[48px] text-white shadow-2xl">
+                      <h4 className="font-black text-[10px] opacity-40 uppercase tracking-widest mb-8">Differential Stack</h4>
+                      <div className="space-y-5">
+                        {result.differentials.map((d, i) => (
+                          <div key={i} className="p-6 bg-white/5 rounded-[32px] border border-white/10 group hover:bg-white/10 transition-all">
+                             <div className="flex justify-between items-center mb-1"><span className="text-[9px] font-black text-teal-400 uppercase tracking-widest">{d.icd10}</span><span className="text-teal-400 font-black text-sm">{(d.confidence * 100).toFixed(0)}%</span></div>
+                             <p className="font-black text-md leading-tight">{d.diagnosis}</p>
+                          </div>
+                        ))}
+                      </div>
+                   </div>
+                   <div className="bg-rose-50 p-8 rounded-[40px] border border-rose-100 flex gap-6 items-start">
+                      <ShieldAlert size={32} className="text-rose-500 shrink-0" />
+                      <div><h5 className="text-[10px] font-black text-rose-800 uppercase tracking-widest mb-2">Safety Protocol</h5><p className="text-xs text-rose-700 font-bold leading-relaxed">{result.safetyWarning}</p></div>
+                   </div>
+                   <button onClick={() => setStep(1)} className="w-full bg-slate-100 text-slate-400 py-6 rounded-3xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-900 hover:text-white transition-all shadow-inner">Start New Session</button>
                 </div>
              </div>
           </div>

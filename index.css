@@ -1,0 +1,5 @@
+/* Minimal CSS to satisfy build requirements */
+body {
+  margin: 0;
+  padding: 0;
+}

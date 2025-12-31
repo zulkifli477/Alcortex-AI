@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { PatientData, DiagnosisOutput, Language } from "../types";
 
@@ -6,44 +7,47 @@ export const analyzePatientData = async (
   language: Language = Language.EN,
   imageUri?: string
 ): Promise<DiagnosisOutput> => {
-  // Fix: Initialize GoogleGenAI directly with process.env.API_KEY per SDK guidelines.
-  // Assume API_KEY is pre-configured and accessible.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Always create instance inside the function for the latest API Key
+  const apiKey = process.env.API_KEY || "";
+  if (!apiKey) {
+    throw new Error("An API Key must be set when running in a browser. Please select your API key.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   const modelName = "gemini-3-pro-preview";
   
   const labDataString = `
-    Blood: ${JSON.stringify(patient.labBlood)}
-    Urine: ${JSON.stringify(patient.labUrine)}
-    Sputum: ${JSON.stringify(patient.labSputum)}
+    - BLOOD PANEL: ${JSON.stringify(patient.labBlood)}
+    - URINE ANALYSIS: ${JSON.stringify(patient.labUrine)}
+    - SPUTUM ANALYSIS: ${JSON.stringify(patient.labSputum)}
   `;
 
   const vitalsString = `
-    Blood Pressure: ${patient.vitals.bpSystolic}/${patient.vitals.bpDiastolic} mmHg
-    Heart Rate: ${patient.vitals.heartRate} bpm
-    Respiratory Rate: ${patient.vitals.respiratoryRate} /min
-    Temperature: ${patient.vitals.temperature} °C
+    BP: ${patient.vitals.bpSystolic}/${patient.vitals.bpDiastolic} mmHg, 
+    HR: ${patient.vitals.heartRate} bpm, 
+    Temp: ${patient.vitals.temperature} C, 
     SpO2: ${patient.vitals.spo2}%
-    Weight: ${patient.vitals.weight} kg
-    Height: ${patient.vitals.height} cm
   `;
 
   const prompt = `
-    Perform a professional clinical diagnosis for the following patient data.
-    IMPORTANT: You must provide the entire response in ${language}. 
+    You are Alcortex AI, a senior clinical diagnostic system. 
+    Analyze the following patient data and provide a rigorous medical report.
+    Language of response: ${language}.
     
-    Name: ${patient.name}
-    Age: ${patient.age}
-    Gender: ${patient.gender}
-    Complaints: ${patient.complaints}
-    History: ${patient.history}
-    Meds: ${patient.meds}
-    Allergies: ${patient.allergies}
-    Lifestyle: Smoking: ${patient.smoking}, Alcohol: ${patient.alcohol}, Activity: ${patient.activity}
-    Vital Signs: ${vitalsString}
-    Laboratory Data: ${labDataString}
-    ${imageUri ? "An imaging scan is also provided for visual analysis." : ""}
+    PATIENT: ${patient.name} (${patient.age}Y, ${patient.gender})
+    COMPLAINTS: ${patient.complaints}
+    HISTORY: ${patient.history}
+    VITALS: ${vitalsString}
+    LABS: ${labDataString}
+    ${imageUri ? "An imaging scan is provided. Correlate visual pathology with clinical lab markers." : ""}
 
-    Provide the output in JSON format with specific keys: mainDiagnosis, differentials (array of {diagnosis, icd10, confidence}), severity, confidenceScore, interpretation, safetyWarning, followUp, medicationRecs.
+    OUTPUT REQUIREMENTS:
+    1. Main Diagnosis (High specificity).
+    2. Differential Stack (Top 3) with ICD-10.
+    3. Clinical Interpretation (Linking labs to symptoms).
+    4. Follow-up plan & Medication recommendations.
+    5. Safety Warnings.
+    6. Return ONLY valid JSON.
   `;
 
   try {
@@ -92,12 +96,18 @@ export const analyzePatientData = async (
       }
     });
 
-    // Fix: Directly access the .text property (not a method) from GenerateContentResponse
     const text = response.text;
-    if (!text) throw new Error("Gagal mendapatkan respon dari AI.");
+    if (!text) throw new Error("AI response was empty.");
     return JSON.parse(text);
   } catch (error: any) {
-    console.error("Gemini AI Error:", error);
-    throw error;
+    console.error("Gemini Execution Error:", error);
+    
+    // Handle specific AI Studio error for missing project key selection
+    if (error.message?.includes("Requested entity was not found") && typeof window.aistudio !== 'undefined') {
+      await window.aistudio.openSelectKey();
+      throw new Error("Session expired or project missing. Please re-select your API key and try again.");
+    }
+    
+    throw new Error(error.message || "AI Synthesis failed. Please check network and API configuration.");
   }
 };

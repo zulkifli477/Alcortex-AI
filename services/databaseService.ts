@@ -1,10 +1,8 @@
-
 import { User, SavedRecord } from '../types';
 
 /**
  * databaseService handles all data persistence.
- * In this standalone version, it uses localStorage to ensure
- * the app works immediately on any static hosting (like Netlify).
+ * Uses localStorage with enhanced consistency checks.
  */
 export const databaseService = {
   // --- USER MANAGEMENT ---
@@ -30,31 +28,27 @@ export const databaseService = {
     }
   },
 
-  // --- ACTIVITY LOGS ---
-  async logActivity(email: string, action: string): Promise<void> {
-    try {
-      const logs = JSON.parse(localStorage.getItem('alcortex_logs') || '[]');
-      logs.push({ email, action, timestamp: new Date().toISOString() });
-      // Keep only last 50 logs to save space
-      localStorage.setItem('alcortex_logs', JSON.stringify(logs.slice(-50)));
-    } catch (error) {}
-  },
-
   // --- RECORD MANAGEMENT (EMR) ---
   async saveDiagnosis(userEmail: string, record: SavedRecord): Promise<void> {
     try {
       const records = this.getRecordsLocal();
-      // Prevent duplicates
+      // Ensure we don't duplicate records with same ID
       const filtered = records.filter(r => r.id !== record.id);
-      filtered.unshift(record);
-      localStorage.setItem('alcortex_emr_vault', JSON.stringify(filtered));
+      
+      // Store new record at the top
+      const updated = [record, ...filtered];
+      
+      // Keep EMR vault at a reasonable size (e.g., 200 records) to avoid localStorage limits
+      localStorage.setItem('alcortex_emr_vault', JSON.stringify(updated.slice(0, 200)));
+      
+      // Trigger a storage event for cross-tab sync if necessary
+      window.dispatchEvent(new Event('storage'));
     } catch (error) {
       console.error("Failed to save record locally:", error);
     }
   },
 
   async getRecords(): Promise<SavedRecord[]> {
-    // Returns data directly from local storage
     return this.getRecordsLocal();
   },
 
@@ -63,8 +57,12 @@ export const databaseService = {
       const data = localStorage.getItem('alcortex_emr_vault');
       if (!data) return [];
       const parsed = JSON.parse(data);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) return [];
+      
+      // Ensure records are sorted by date descending
+      return parsed.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     } catch (e) { 
+      console.error("Critical error parsing EMR Vault:", e);
       return []; 
     }
   }

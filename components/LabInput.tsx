@@ -1,280 +1,254 @@
-
-import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, Search, ClipboardList, AlertCircle } from 'lucide-react';
+import React from 'react';
+import { Plus, Trash2, ClipboardList, Database, Sparkles, Zap, RotateCcw } from 'lucide-react';
 import { LabResult } from '../types';
+
+// Kamus Referensi Klinis Master Terintegrasi (Darah, Urin, Sputum)
+export const LAB_MASTER_DATA: Record<string, { unit: string; range: string }> = {
+  // --- BLOOD PANEL ---
+  'Hemoglobin': { unit: 'g/dL', range: '12.0 - 16.0' },
+  'Hematocrit': { unit: '%', range: '36.0 - 50.0' },
+  'WBC Count': { unit: 'x10^9/L', range: '4.0 - 11.0' },
+  'Platelet Count': { unit: 'x10^9/L', range: '150 - 450' },
+  'RBC Count': { unit: 'x10^12/L', range: '4.2 - 5.9' },
+  'MCV': { unit: 'fL', range: '80 - 100' },
+  'MCH': { unit: 'pg', range: '27 - 33' },
+  'MCHC': { unit: 'g/dL', range: '32 - 36' },
+  'Neutrophils': { unit: '%', range: '40 - 75' },
+  'Lymphocytes': { unit: '%', range: '20 - 45' },
+  'Monocytes': { unit: '%', range: '2 - 8' },
+  'Eosinophils': { unit: '%', range: '1 - 4' },
+  'Basophils': { unit: '%', range: '0 - 1' },
+  'CRP': { unit: 'mg/L', range: '0.0 - 5.0' },
+  'HbA1c': { unit: '%', range: '4.0 - 5.6' },
+  'Blood Glucose (Random)': { unit: 'mg/dL', range: '70 - 140' },
+  'Blood Glucose (Fasting)': { unit: 'mg/dL', range: '70 - 99' },
+  'Creatinine': { unit: 'mg/dL', range: '0.6 - 1.2' },
+  'Urea': { unit: 'mg/dL', range: '7 - 20' },
+  'Uric Acid': { unit: 'mg/dL', range: '3.4 - 7.0' },
+  'Sodium': { unit: 'mEq/L', range: '135 - 145' },
+  'Potassium': { unit: 'mEq/L', range: '3.5 - 5.1' },
+  'Chloride': { unit: 'mEq/L', range: '98 - 107' },
+  'ALT (SGPT)': { unit: 'U/L', range: '7 - 56' },
+  'AST (SGOT)': { unit: 'U/L', range: '10 - 40' },
+  'Bilirubin Total': { unit: 'mg/dL', range: '0.1 - 1.2' },
+  'Albumin': { unit: 'g/dL', range: '3.4 - 5.4' },
+
+  // --- URINE PANEL ---
+  'pH Urine': { unit: 'pH', range: '4.5 - 8.0' },
+  'Specific Gravity': { unit: 'SG', range: '1.005 - 1.030' },
+  'Urine Protein': { unit: 'Qual', range: 'Negative' },
+  'Urine Glucose': { unit: 'Qual', range: 'Negative' },
+  'Urine Ketones': { unit: 'Qual', range: 'Negative' },
+  'Urine Bilirubin': { unit: 'Qual', range: 'Negative' },
+  'Urine Blood': { unit: 'Qual', range: 'Negative' },
+  'Urine Nitrite': { unit: 'Qual', range: 'Negative' },
+  'Leukocyte Esterase': { unit: 'Qual', range: 'Negative' },
+  'Urobilinogen': { unit: 'mg/dL', range: '0.2 - 1.0' },
+  'Urine Color': { unit: 'Obs', range: 'Straw/Yellow' },
+  'Urine Clarity': { unit: 'Obs', range: 'Clear' },
+
+  // --- SPUTUM PANEL ---
+  'Gram Stain (Sputum)': { unit: 'Qual', range: 'Normal Flora' },
+  'Acid-Fast Bacilli (AFB)': { unit: 'Qual', range: 'Negative' },
+  'Sputum Culture': { unit: 'Qual', range: 'No Pathogen Growth' },
+  'Sputum Color': { unit: 'Obs', range: 'Clear/White' },
+  'Sputum Consistency': { unit: 'Obs', range: 'Thin/Mucoid' },
+  'Epithelial Cells': { unit: '/LPB', range: '< 10' },
+  'Leukocytes (Sputum)': { unit: '/LPB', range: '< 25' }
+};
+
+const STANDARD_MEDICAL_UNITS = Array.from(new Set([
+  ...Object.values(LAB_MASTER_DATA).map(v => v.unit).filter(u => u !== ''),
+  'mmol/L', 'μmol/L', 'IU/L', 'Negative', 'Positive', 'Trace'
+]));
+
+interface LabTemplate {
+  name: string;
+  parameters: string[];
+}
 
 interface LabInputProps {
   title: string;
   results: LabResult[];
   setResults: (results: LabResult[]) => void;
+  suggestions?: string[];
+  templates?: LabTemplate[];
 }
 
-const COMMON_LAB_PARAMETERS = [
-  // Blood
-  "Hemoglobin", "Leukocytes (WBC)", "Platelets", "Hematocrit", "Erythrocytes (RBC)",
-  "MCV", "MCH", "MCHC", "RDW", "Neutrophils", "Lymphocytes", "Monocytes", "Eosinophils", "Basophils",
-  "Glucose (Fast)", "Glucose (PP)", "HbA1c", "Creatinine", "Urea (BUN)", "Uric Acid",
-  "Cholesterol (Total)", "HDL Cholesterol", "LDL Cholesterol", "Triglycerides",
-  "ALT (SGPT)", "AST (SGOT)", "Albumin", "Total Protein", "Bilirubin (Total)",
-  "Sodium (Na)", "Potassium (K)", "Chloride (Cl)", "Calcium (Ca)",
-  "TSH", "FT4", "C-Reactive Protein (CRP)",
-  // Urine
-  "Urine Color", "Urine Clarity", "Urine pH", "Specific Gravity", "Protein (Urine)", 
-  "Glucose (Urine)", "Ketones (Urine)", "Bilirubin (Urine)", "Urobilinogen", 
-  "Nitrite", "Leukocyte Esterase", "Blood (Urine)", "Urine Sediment", "RBC (Urine)", "WBC (Urine)",
-  // Sputum
-  "Sputum Color", "Sputum Consistency", "AFB (Acid-Fast Bacilli)", "Gram Stain", 
-  "Sputum Culture", "Sensitivity", "KOH Prep", "Sputum Cytology"
-];
-
-const STANDARD_LAB_SETS: Record<string, LabResult[]> = {
-  "Blood": [
-    { parameter: 'Hemoglobin', value: '', unit: 'g/dL', referenceRange: '13.5-17.5' },
-    { parameter: 'Leukocytes (WBC)', value: '', unit: '10^3/uL', referenceRange: '4.5-11.0' },
-    { parameter: 'Platelets', value: '', unit: '10^3/uL', referenceRange: '150-450' },
-    { parameter: 'Hematocrit', value: '', unit: '%', referenceRange: '41-50' }
-  ],
-  "Urine": [
-    { parameter: 'Specific Gravity', value: '', unit: '-', referenceRange: '1.005-1.030' },
-    { parameter: 'Urine pH', value: '', unit: '-', referenceRange: '4.5-8.0' },
-    { parameter: 'Protein (Urine)', value: '', unit: '-', referenceRange: 'Negative' },
-    { parameter: 'Glucose (Urine)', value: '', unit: '-', referenceRange: 'Negative' },
-    { parameter: 'Nitrite', value: '', unit: '-', referenceRange: 'Negative' }
-  ],
-  "Sputum": [
-    { parameter: 'AFB (Acid-Fast Bacilli)', value: '', unit: '-', referenceRange: 'Negative' },
-    { parameter: 'Gram Stain', value: '', unit: '-', referenceRange: '-' },
-    { parameter: 'Sputum Color', value: '', unit: '-', referenceRange: 'Clear/White' },
-    { parameter: 'Sputum Consistency', value: '', unit: '-', referenceRange: 'Mucoid' }
-  ]
-};
-
-const LabInput: React.FC<LabInputProps> = ({ title, results, setResults }) => {
-  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
-  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
-  const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const addRow = () => {
-    setResults([...results, { parameter: '', value: '', unit: '', referenceRange: '' }]);
-  };
-
-  const removeRow = (index: number) => {
-    setResults(results.filter((_, i) => i !== index));
-  };
-
-  const loadTemplate = () => {
-    const key = Object.keys(STANDARD_LAB_SETS).find(k => title.toLowerCase().includes(k.toLowerCase()));
-    if (key && STANDARD_LAB_SETS[key]) {
-      const isEmpty = results.length === 0 || (results.length === 1 && !results[0].parameter);
-      if (isEmpty) {
-        setResults([...STANDARD_LAB_SETS[key]]);
-      } else {
-        setResults([...results, ...STANDARD_LAB_SETS[key]]);
-      }
+const LabInput: React.FC<LabInputProps> = ({ title, results, setResults, suggestions = [], templates = [] }) => {
+  const listId = `suggestions-${title.replace(/\s+/g, '-').toLowerCase()}`;
+  const unitListId = `units-${title.replace(/\s+/g, '-').toLowerCase()}`;
+  
+  const addRow = () => setResults([...results, { parameter: '', value: '', unit: '-', referenceRange: '-' }]);
+  
+  const applyTemplate = (params: string[]) => {
+    const newRows = params.map(p => {
+      const ref = LAB_MASTER_DATA[p] || { unit: '-', range: '-' };
+      return {
+        parameter: p,
+        value: '',
+        unit: ref.unit,
+        referenceRange: ref.range
+      };
+    });
+    
+    const existingParams = new Set(results.map(r => r.parameter.toLowerCase()));
+    const uniqueNewRows = newRows.filter(r => !existingParams.has(r.parameter.toLowerCase()));
+    
+    // Clear initial empty row if it's the only one and is empty
+    let currentResults = [...results];
+    if (currentResults.length === 1 && !currentResults[0].parameter) {
+      currentResults = [];
     }
+    
+    setResults([...currentResults, ...uniqueNewRows]);
   };
 
-  const validateValue = (val: string) => {
-    if (!val) return true;
-    // Allow numbers, decimals, Negative, Positive, Clear, Cloudy, and categorical signs like +, ++
-    const numericOrCategorical = /^-?\d*\.?\d*$|^Negative$|^Positive$|^Clear$|^Cloudy$|^\+*$/i;
-    return numericOrCategorical.test(val);
-  };
-
-  const validateUnit = (val: string) => {
-    if (!val) return true;
-    // Standard units allow letters, numbers, %, /, ^, -, ., and spaces
-    const unitRegex = /^[a-zA-Z0-9%\/\^\-\.\s]*$/;
-    return unitRegex.test(val);
-  };
-
+  const removeRow = (index: number) => setResults(results.filter((_, i) => i !== index));
+  
+  const clearAll = () => setResults([]);
+  
   const updateRow = (index: number, field: keyof LabResult, val: string) => {
     const newResults = [...results];
     newResults[index][field] = val;
-    setResults(newResults);
 
-    if (field === 'parameter') {
-      const filtered = COMMON_LAB_PARAMETERS.filter(p => 
-        p.toLowerCase().includes(val.toLowerCase())
-      );
-      setFilteredSuggestions(filtered);
-      setActiveSuggestionIndex(index);
-      setShowSuggestions(val.length > 0 && filtered.length > 0);
+    // Auto-Populate Unit and Range when parameter is selected from Master Data
+    if (field === 'parameter' && LAB_MASTER_DATA[val]) {
+      newResults[index].unit = LAB_MASTER_DATA[val].unit;
+      newResults[index].referenceRange = LAB_MASTER_DATA[val].range;
     }
-  };
 
-  const selectSuggestion = (index: number, suggestion: string) => {
-    updateRow(index, 'parameter', suggestion);
-    setShowSuggestions(false);
+    setResults(newResults);
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-3">
-           <h3 className="text-lg font-bold text-slate-800">{title}</h3>
-           <div className="h-4 w-[1px] bg-slate-200"></div>
-           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{results.length} markers</span>
+    <div className="bg-white rounded-[40px] border border-slate-100 p-8 md:p-10 shadow-xl space-y-8 animate-fade-in">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="flex items-center gap-4">
+           <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 shadow-inner"><Database size={20} /></div>
+           <div>
+             <h3 className="text-xl font-black text-slate-800 tracking-tight">{title}</h3>
+             <div className="flex items-center gap-2 mt-1">
+               <Sparkles size={10} className="text-teal-500" />
+               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{results.length} markers synced • Neural Engine Active</p>
+             </div>
+           </div>
         </div>
-        <div className="flex items-center gap-2">
+        
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {templates?.map((tpl, i) => (
+            <button
+              key={i}
+              onClick={() => applyTemplate(tpl.parameters)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-50/50 border border-blue-100 rounded-xl text-[9px] font-black text-blue-600 uppercase tracking-widest hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all shadow-sm active:scale-95"
+            >
+              <Zap size={10} fill="currentColor" />
+              {tpl.name}
+            </button>
+          ))}
+          
+          <div className="h-8 w-[1px] bg-slate-100 hidden md:block mx-1"></div>
+          
           <button 
-            type="button"
-            onClick={loadTemplate}
-            title="Load standard template"
-            className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-[10px] font-black uppercase tracking-widest"
+            onClick={addRow} 
+            className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg active:scale-95"
           >
-            <ClipboardList size={14} />
-            Template
+            <Plus size={16} /> Add Marker
           </button>
-          <button 
-            type="button"
-            onClick={addRow}
-            className="p-2 bg-teal-50 text-teal-600 rounded-lg hover:bg-teal-100 transition-colors"
-          >
-            <Plus size={18} />
-          </button>
+
+          {results.length > 0 && (
+            <button 
+              onClick={clearAll} 
+              className="p-2.5 text-slate-300 hover:text-rose-500 transition-colors"
+              title="Clear All"
+            >
+              <RotateCcw size={18} />
+            </button>
+          )}
         </div>
       </div>
-      
-      <div className="overflow-x-auto min-h-[150px]">
-        <table className="w-full text-sm">
+
+      <div className="overflow-x-auto custom-scrollbar">
+        <table className="w-full text-left">
           <thead>
-            <tr className="text-left text-slate-500 border-b border-slate-100">
-              <th className="pb-3 pr-2 font-black text-[10px] uppercase tracking-widest">Parameter</th>
-              <th className="pb-3 pr-2 font-black text-[10px] uppercase tracking-widest">Value</th>
-              <th className="pb-3 pr-2 font-black text-[10px] uppercase tracking-widest">Unit</th>
-              <th className="pb-3 pr-2 font-black text-[10px] uppercase tracking-widest">Ref. Range</th>
-              <th className="pb-3 w-10"></th>
+            <tr className="text-slate-400 text-[9px] font-black uppercase tracking-widest border-b border-slate-50">
+              <th className="pb-6 px-4">Parameter</th>
+              <th className="pb-6 px-4">Result Value</th>
+              <th className="pb-6 px-4">Unit</th>
+              <th className="pb-6 px-4">Ref. Range</th>
+              <th className="pb-6 w-10"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {results.map((row, idx) => {
-              const valueValid = validateValue(row.value);
-              const unitValid = validateUnit(row.unit);
-
-              return (
-                <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
-                  <td className="py-2 pr-2 relative min-w-[180px]">
-                    <div className="flex items-center bg-slate-50 rounded-lg px-3 py-2 border border-transparent focus-within:border-teal-500/30 focus-within:bg-white transition-all">
-                      <Search size={12} className="text-slate-300 mr-2" />
-                      <input
-                        className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none text-xs font-bold text-slate-700"
-                        placeholder="Search parameter..."
-                        value={row.parameter}
-                        onFocus={() => {
-                          if (row.parameter) {
-                            const filtered = COMMON_LAB_PARAMETERS.filter(p => 
-                              p.toLowerCase().includes(row.parameter.toLowerCase())
-                            );
-                            setFilteredSuggestions(filtered);
-                            setActiveSuggestionIndex(idx);
-                            setShowSuggestions(filtered.length > 0);
-                          }
-                        }}
-                        onChange={(e) => updateRow(idx, 'parameter', e.target.value)}
-                      />
-                    </div>
-                    {showSuggestions && activeSuggestionIndex === idx && (
-                      <div 
-                        ref={dropdownRef}
-                        className="absolute z-50 left-0 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto overflow-x-hidden custom-scrollbar ring-4 ring-slate-900/5 animate-fade-in"
-                      >
-                        {filteredSuggestions.map((suggestion, sIdx) => (
-                          <button
-                            key={sIdx}
-                            type="button"
-                            className="w-full text-left px-4 py-2.5 text-[10px] font-black uppercase tracking-tight hover:bg-teal-50 text-slate-600 border-b border-slate-50 last:border-0 hover:text-teal-600 transition-colors"
-                            onClick={() => selectSuggestion(idx, suggestion)}
-                          >
-                            {suggestion}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </td>
-                  <td className="py-2 pr-2 relative">
-                    <div className="relative">
-                      <input
-                        className={`w-full bg-slate-50 border rounded-lg px-3 py-2 focus:ring-2 transition-all text-xs font-bold text-slate-700 outline-none ${
-                          valueValid 
-                            ? 'border-transparent focus:ring-teal-500/20 focus:border-teal-500/50 focus:bg-white' 
-                            : 'border-rose-300 bg-rose-50/50 focus:ring-rose-500/20 focus:border-rose-500 text-rose-700'
-                        }`}
-                        placeholder="Value"
-                        value={row.value}
-                        onChange={(e) => updateRow(idx, 'value', e.target.value)}
-                      />
-                      {!valueValid && (
-                        <div className="absolute right-2 top-1/2 -translate-y-1/2 text-rose-500" title="Invalid clinical value format">
-                          <AlertCircle size={12} />
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-2 pr-2 relative">
-                    <div className="relative">
-                      <input
-                        className={`w-full bg-slate-50 border rounded-lg px-3 py-2 focus:ring-2 transition-all text-xs text-slate-500 outline-none ${
-                          unitValid 
-                            ? 'border-transparent focus:ring-teal-500/20 focus:border-teal-500/50 focus:bg-white' 
-                            : 'border-rose-300 bg-rose-50/50 focus:ring-rose-500/20 focus:border-rose-500 text-rose-700'
-                        }`}
-                        placeholder="Unit"
-                        value={row.unit}
-                        onChange={(e) => updateRow(idx, 'unit', e.target.value)}
-                      />
-                      {!unitValid && (
-                        <div className="absolute right-2 top-1/2 -translate-y-1/2 text-rose-500" title="Invalid unit characters">
-                          <AlertCircle size={12} />
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-2 pr-2">
-                    <input
-                      className="w-full bg-slate-50 border border-transparent rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500/50 focus:bg-white transition-all text-xs text-slate-400"
-                      placeholder="Range"
-                      value={row.referenceRange}
-                      onChange={(e) => updateRow(idx, 'referenceRange', e.target.value)}
-                    />
-                  </td>
-                  <td className="py-2 text-right">
-                    <button 
-                      type="button"
-                      onClick={() => removeRow(idx)}
-                      className="p-2 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
+            {results.map((row, idx) => (
+              <tr key={idx} className="group hover:bg-slate-50/50 transition-all">
+                <td className="py-4 px-2 relative">
+                  <input 
+                    list={listId}
+                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500/10 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none transition-all placeholder:text-slate-300" 
+                    placeholder="Search parameter..." 
+                    value={row.parameter} 
+                    onChange={e => updateRow(idx, 'parameter', e.target.value)} 
+                  />
+                </td>
+                <td className="py-4 px-2">
+                  <input 
+                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500/10 rounded-xl px-4 py-3 text-xs font-black text-blue-600 outline-none transition-all" 
+                    placeholder="Value" 
+                    value={row.value} 
+                    onChange={e => updateRow(idx, 'value', e.target.value)} 
+                  />
+                </td>
+                <td className="py-4 px-2">
+                  <input 
+                    list={unitListId}
+                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500/10 rounded-xl px-4 py-3 text-xs font-bold text-slate-400 outline-none transition-all" 
+                    placeholder="Unit" 
+                    value={row.unit} 
+                    onChange={e => updateRow(idx, 'unit', e.target.value)} 
+                  />
+                </td>
+                <td className="py-4 px-2">
+                  <input 
+                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500/10 rounded-xl px-4 py-3 text-xs font-bold text-slate-400 outline-none transition-all" 
+                    placeholder="Range" 
+                    value={row.referenceRange} 
+                    onChange={e => updateRow(idx, 'referenceRange', e.target.value)} 
+                  />
+                </td>
+                <td className="py-4 text-center">
+                  <button 
+                    onClick={() => removeRow(idx)} 
+                    className="text-slate-200 hover:text-rose-500 transition-colors p-2"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </td>
+              </tr>
+            ))}
             {results.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-slate-400 italic">
-                   <div className="flex flex-col items-center gap-2">
-                      <ClipboardList size={24} className="opacity-20" />
-                      <p className="text-[10px] font-black uppercase tracking-widest">No data points added</p>
-                      <button onClick={loadTemplate} className="text-blue-500 hover:underline text-[10px] font-bold">Load {title} Template</button>
-                   </div>
+                <td colSpan={5} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest text-[10px] opacity-30">
+                  <ClipboardList size={40} className="mx-auto mb-4" />
+                  No Data Markers in this Panel
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      <datalist id={listId}>
+        {Object.keys(LAB_MASTER_DATA).map((param, i) => (
+          <option key={i} value={param} />
+        ))}
+      </datalist>
+
+      <datalist id={unitListId}>
+        {STANDARD_MEDICAL_UNITS.map((u, i) => (
+          <option key={i} value={u} />
+        ))}
+      </datalist>
     </div>
   );
 };

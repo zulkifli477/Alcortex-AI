@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   FileText, 
@@ -10,7 +9,15 @@ import {
   Clock, 
   ArrowLeft,
   Download,
-  AlertCircle
+  AlertCircle,
+  Thermometer,
+  Heart,
+  Wind,
+  Droplets,
+  Scale,
+  Pill,
+  ShieldAlert,
+  MoveVertical
 } from 'lucide-react';
 import { SavedRecord, User } from '../types';
 import { translations } from '../translations';
@@ -55,7 +62,7 @@ const EMRPage: React.FC<EMRPageProps> = ({ user, records }) => {
                   <Calendar size={14} /> {new Date(date).toLocaleDateString()}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Clock size={14} /> {new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  <UserIcon size={14} /> {patient.age}y, {patient.gender}
                 </div>
               </div>
             </div>
@@ -68,28 +75,43 @@ const EMRPage: React.FC<EMRPageProps> = ({ user, records }) => {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
-              <div className="p-8 bg-slate-50 rounded-[40px] border border-slate-100">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">{t.mainDiagnosis}</h4>
-                <p className="text-2xl font-black text-slate-800">{analysis.mainDiagnosis}</p>
-                <div className="h-[1px] bg-slate-200 my-6"></div>
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">{t.interpretation}</h4>
-                <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{analysis.interpretation}</p>
+              {/* History & Complaints */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-8 bg-slate-50 rounded-[40px]">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">{t.complaints}</h4>
+                  <p className="text-sm text-slate-700 font-medium leading-relaxed">{patient.complaints || "None recorded"}</p>
+                </div>
+                <div className="p-8 bg-slate-50 rounded-[40px]">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">{t.history}</h4>
+                  <p className="text-sm text-slate-700 font-medium leading-relaxed">{patient.history || "None recorded"}</p>
+                </div>
               </div>
 
+              {/* Interpretation */}
+              <div className="p-8 bg-slate-50 rounded-[40px] border border-slate-100">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">{t.interpretation}</h4>
+                <p className="text-sm font-medium text-slate-600 leading-relaxed whitespace-pre-wrap">{analysis.interpretation}</p>
+              </div>
+
+              {/* Recs */}
               <div className="grid grid-cols-2 gap-6">
                 <div className="p-8 bg-blue-50 rounded-[40px] border border-blue-100">
                   <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-4">{t.followUp}</h4>
-                  <p className="text-sm font-medium text-blue-800 whitespace-pre-wrap">{analysis.followUp}</p>
+                  <p className="text-xs font-medium text-blue-800 whitespace-pre-wrap">{analysis.followUp}</p>
                 </div>
                 <div className="p-8 bg-teal-50 rounded-[40px] border border-teal-100">
                   <h4 className="text-[10px] font-black uppercase tracking-widest text-teal-600 mb-4">{t.medicationRecs}</h4>
-                  <p className="text-sm font-medium text-teal-800 whitespace-pre-wrap">{analysis.medicationRecs}</p>
+                  <p className="text-xs font-medium text-teal-800 whitespace-pre-wrap">{analysis.medicationRecs}</p>
                 </div>
               </div>
             </div>
 
             <div className="space-y-6">
+              {/* Diagnosis Sidebar */}
               <div className="bg-slate-900 p-8 rounded-[40px] text-white">
+                <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2">Main Diagnosis</h4>
+                <p className="text-xl font-black text-teal-300 mb-8">{analysis.mainDiagnosis}</p>
+                
                 <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-6">{t.differentialDiagnostics}</h4>
                 <div className="space-y-4">
                   {analysis.differentials.map((d, i) => (
@@ -103,16 +125,70 @@ const EMRPage: React.FC<EMRPageProps> = ({ user, records }) => {
                   ))}
                 </div>
               </div>
-              <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-4">
-                 <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t.vitals} Recap</h4>
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center">
-                      <p className="text-[8px] font-black text-slate-400 uppercase">Blood Pressure</p>
-                      <p className="font-bold text-slate-700">{patient.vitals.bpSystolic}/{patient.vitals.bpDiastolic}</p>
+
+              {/* Vitals Summary Sidebar - MOVED HERE */}
+              <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t.vitals}</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2">
+                    <Heart size={16} className="text-rose-500" />
+                    <div>
+                      <p className="text-[8px] font-black text-slate-400 uppercase">BP</p>
+                      <p className="font-bold text-slate-800 text-[10px]">{patient.vitals.bpSystolic}/{patient.vitals.bpDiastolic}</p>
                     </div>
-                    <div className="text-center">
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Activity size={16} className="text-blue-500" />
+                    <div>
+                      <p className="text-[8px] font-black text-slate-400 uppercase">HR</p>
+                      <p className="font-bold text-slate-800 text-[10px]">{patient.vitals.heartRate}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Thermometer size={16} className="text-orange-500" />
+                    <div>
+                      <p className="text-[8px] font-black text-slate-400 uppercase">Temp</p>
+                      <p className="font-bold text-slate-800 text-[10px]">{patient.vitals.temperature}°C</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Droplets size={16} className="text-teal-500" />
+                    <div>
                       <p className="text-[8px] font-black text-slate-400 uppercase">SpO2</p>
-                      <p className="font-bold text-slate-700">{patient.vitals.spo2}%</p>
+                      <p className="font-bold text-slate-800 text-[10px]">{patient.vitals.spo2}%</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Wind size={16} className="text-slate-400" />
+                    <div>
+                      <p className="text-[8px] font-black text-slate-400 uppercase">RR</p>
+                      <p className="font-bold text-slate-800 text-[10px]">{patient.vitals.respiratoryRate}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Scale size={16} className="text-slate-400" />
+                    <div>
+                      <p className="text-[8px] font-black text-slate-400 uppercase">Weight</p>
+                      <p className="font-bold text-slate-800 text-[10px]">{patient.vitals.weight}kg</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lifestyle & Meds Sidebar */}
+              <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6">
+                 <div>
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">{t.meds} & Alergi</h4>
+                    <p className="text-xs font-bold text-slate-700">{patient.meds || "None"}</p>
+                 </div>
+                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50">
+                    <div>
+                      <p className="text-[8px] font-black text-slate-400 uppercase">Smoking</p>
+                      <p className="text-[10px] font-bold text-slate-700">{patient.smoking}</p>
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-black text-slate-400 uppercase">Alcohol</p>
+                      <p className="text-[10px] font-bold text-slate-700">{patient.alcohol}</p>
                     </div>
                  </div>
               </div>
@@ -177,7 +253,7 @@ const EMRPage: React.FC<EMRPageProps> = ({ user, records }) => {
           <div className="py-20 flex flex-col items-center justify-center text-center opacity-40">
             <FileText size={64} className="mb-6" />
             <h4 className="font-black uppercase tracking-widest text-sm">Vault Empty</h4>
-            <p className="text-xs mt-2 max-w-xs">No examination records match your search or have been recorded yet.</p>
+            <p className="text-xs mt-2 max-w-xs">No examination records match your search.</p>
           </div>
         )}
       </div>

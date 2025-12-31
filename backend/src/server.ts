@@ -1,4 +1,3 @@
-
 import express from 'express';
 import mysql from 'mysql2';
 import cors from 'cors';
@@ -8,10 +7,11 @@ import { analyzePatient } from './controllers/ai.controller';
 const app = express();
 const PORT = config.port;
 
-// Middleware
 app.use(cors());
-
-// Fix: Cast express.json middleware to any to prevent the compiler from misinterpreting it as PathParams in app.use.
+/**
+ * Explicit cast to any to resolve potential Type mismatch between express.json 
+ * and RequestHandler in some TypeScript/Express version combinations.
+ */
 app.use(express.json({ limit: '50mb' }) as any);
 
 // Database Connection Pool
@@ -25,7 +25,6 @@ const db = mysql.createPool({
 db.getConnection((err, connection) => {
     if (err) {
         console.error('Database connection failed:', err.message);
-        console.log('Pastikan MySQL berjalan dan database "alcortex_db" sudah dibuat.');
     } else {
         console.log('Connected to MySQL Database (Alcortex)');
         connection.release();
@@ -57,13 +56,12 @@ app.get('/api/records', (req, res) => {
     });
 });
 
-// Health Check Endpoint - Menandakan engine AI yang digunakan (OpenAI GPT-4o)
 app.get('/api/health', (req, res) => res.json({ 
     status: 'OK', 
-    engine: 'GPT-4o Ready',
+    engine: 'Alcortex Neural Engine Ready',
     timestamp: new Date().toISOString()
 }));
 
 app.listen(PORT, () => {
-    console.log(`Alcortex Backend organized at http://localhost:${PORT}`);
+    console.log(`Alcortex Backend running on http://localhost:${PORT}`);
 });

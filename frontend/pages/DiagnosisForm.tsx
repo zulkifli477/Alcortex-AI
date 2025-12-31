@@ -23,7 +23,9 @@ import {
   Stethoscope,
   CheckCircle2,
   ArrowUpRight,
-  Info
+  Info,
+  Circle,
+  CheckCircle
 } from 'lucide-react';
 import LabInput from '../../components/LabInput';
 import { PatientData, DiagnosisOutput, User, SavedRecord, Vitals, SmokingLevel, AlcoholLevel } from '../../types';
@@ -70,12 +72,14 @@ interface DiagnosisFormProps {
   onSaveRecord: (record: SavedRecord) => Promise<void>;
 }
 
+type AnalysisStage = 'idle' | 'initializing' | 'processing' | 'complete';
+
 const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DiagnosisOutput | null>(null);
   const [step, setStep] = useState(1);
-  const [analysisStatus, setAnalysisStatus] = useState<string>('');
+  const [analysisStage, setAnalysisStage] = useState<AnalysisStage>('idle');
   
   const t = translations[user.language];
   
@@ -124,21 +128,26 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
   const handleAnalyze = async () => {
     setLoading(true);
     setError(null);
-    setAnalysisStatus(t.neuralCore || 'Initializing Neural Core...');
-    setTimeout(() => setAnalysisStatus(t.clinicalArchive || 'Syncing Clinical EMR...'), 800);
-    setTimeout(() => setAnalysisStatus(t.lab || 'Mapping Biochemical Markers...'), 1600);
-    setTimeout(() => setAnalysisStatus(t.intelligence || 'Finalizing Diagnostic Synthesis...'), 2400);
+    setAnalysisStage('initializing');
 
     try {
+      await new Promise(r => setTimeout(r, 1200));
+      setAnalysisStage('processing');
+
       const analysis = await apiService.analyzePatient(patient, user.language);
+      
+      setAnalysisStage('complete');
       setResult(analysis);
+      
+      await new Promise(r => setTimeout(r, 800));
+      
       await onSaveRecord({ id: `ALCOR-${Date.now()}`, date: new Date().toISOString(), patient, analysis });
       setStep(4);
     } catch (err: any) {
       setError(err.message || "Neural Engine Critical Error");
+      setAnalysisStage('idle');
     } finally {
       setLoading(false);
-      setAnalysisStatus('');
     }
   };
 
@@ -146,122 +155,177 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
     if (!result) return;
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const timestamp = new Date().toLocaleString();
 
-    // Header & Branding
-    doc.setFillColor(15, 23, 42); 
-    doc.rect(0, 0, pageWidth, 50, 'F');
+    // 1. Header & Branding
+    doc.setFillColor(15, 23, 42); // Slate-900
+    doc.rect(0, 0, pageWidth, 45, 'F');
+    
+    // Add "Confidential" Tag
+    doc.setFillColor(255, 255, 255, 0.1);
+    doc.roundedRect(pageWidth - 60, 10, 50, 8, 2, 2, 'F');
+    doc.setFontSize(8);
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(28);
     doc.setFont("helvetica", "bold");
-    doc.text('ALCORTEX AI', 20, 22);
-    doc.setFontSize(10);
-    doc.setTextColor(45, 212, 191);
-    doc.text(t.reportSubtitle || 'PRECISION CLINICAL AI SUITE', 20, 32);
+    doc.text("CONFIDENTIAL MEDICAL REPORT", pageWidth - 35, 15.5, { align: 'center' });
 
-    doc.setTextColor(255, 255, 255);
-    doc.text(`${t.pdfReportId}: ${patient.rmNo}`, pageWidth - 20, 22, { align: 'right' });
-    doc.text(`${t.pdfDate}: ${new Date().toLocaleDateString()}`, pageWidth - 20, 30, { align: 'right' });
+    doc.setFontSize(26);
+    doc.text('ALCORTEX AI', 20, 25);
+    doc.setFontSize(9);
+    doc.setTextColor(45, 212, 191); // Teal-400
+    doc.setFont("helvetica", "bold");
+    doc.text('PRECISION CLINICAL DIAGNOSTIC SUITE V1.2', 20, 33);
 
-    // Section 1: Patient Profile & Identity
+    // Header Meta Data
+    doc.setTextColor(200, 200, 200);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text(`DOC ID: ${new Date().getTime()}`, pageWidth - 20, 28, { align: 'right' });
+    doc.text(`ISSUED: ${timestamp}`, pageWidth - 20, 33, { align: 'right' });
+
+    // 2. Patient Profile Box
+    doc.setFillColor(248, 250, 252); // Slate-50
+    doc.roundedRect(15, 55, pageWidth - 30, 35, 3, 3, 'F');
+    
     doc.setTextColor(15, 23, 42);
-    doc.setFontSize(14);
-    doc.text(t.pdfPatientProfile || 'PATIENT PROFILE', 20, 65);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("PATIENT IDENTITY", 20, 65);
+    
     autoTable(doc, {
-      startY: 70,
-      theme: 'grid',
+      startY: 68,
+      margin: { left: 20 },
+      theme: 'plain',
+      tableWidth: pageWidth - 40,
       body: [
-        [t.fullName, patient.name.toUpperCase(), t.rmNo, patient.rmNo],
-        [`${t.age}/${t.gender}`, `${patient.age}Y / ${patient.gender}`, t.bloodType, patient.bloodType],
+        [t.fullName, patient.name.toUpperCase(), t.medicalRecordId, patient.rmNo],
+        [`${t.age} / ${t.gender}`, `${patient.age}Y / ${patient.gender}`, t.bloodType, patient.bloodType],
+        ["Birth Date", patient.dob || "-", "Profession ID", user.professionId || "-"]
       ],
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [15, 23, 42] }
+      styles: { fontSize: 8, cellPadding: 2 },
+      columnStyles: { 0: { fontStyle: 'bold', textColor: [100, 116, 139], cellWidth: 35 }, 2: { fontStyle: 'bold', textColor: [100, 116, 139], cellWidth: 35 } }
     });
 
-    // Section 2: Narrative & Subjective Data
-    doc.text(t.narrative || 'CLINICAL NARRATIVE', 20, (doc as any).lastAutoTable.finalY + 15);
-    autoTable(doc, {
-      startY: (doc as any).lastAutoTable.finalY + 20,
-      theme: 'grid',
-      body: [
-        [t.currentComplaints, patient.complaints || '-'],
-        [t.history, patient.history || '-'],
-        [t.meds, patient.meds || '-'],
-      ],
-      styles: { fontSize: 8 },
-      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 40 } }
-    });
+    // 3. Clinical Findings & Vitals
+    let currentY = (doc as any).lastAutoTable.finalY + 15;
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text("PHYSIOLOGICAL DASHBOARD", 20, currentY);
 
-    // Section 3: Vitals & Lifestyle
-    doc.text(t.pdfVitalsSummary || 'VITALS & LIFESTYLE', 20, (doc as any).lastAutoTable.finalY + 15);
     autoTable(doc, {
-      startY: (doc as any).lastAutoTable.finalY + 20,
+      startY: currentY + 5,
       theme: 'grid',
-      head: [[t.bp, t.hr, t.temp, t.spo2, t.rr, t.weight, t.smokingHistory, t.alcoholHistory]],
+      head: [[t.bp, t.hr, t.temp, t.spo2, t.rr, t.weight, "Smoking", "Alcohol"]],
       body: [[
         `${patient.vitals.bpSystolic}/${patient.vitals.bpDiastolic}`,
         patient.vitals.heartRate,
-        patient.vitals.temperature,
-        patient.vitals.spo2,
+        `${patient.vitals.temperature}°C`,
+        `${patient.vitals.spo2}%`,
         patient.vitals.respiratoryRate,
-        patient.vitals.weight,
+        `${patient.vitals.weight}kg`,
         patient.smoking,
         patient.alcohol
       ]],
       styles: { fontSize: 8, halign: 'center' },
-      headStyles: { fillColor: [51, 65, 85] }
+      headStyles: { fillColor: [51, 65, 85], fontStyle: 'bold' }
     });
 
-    // Section 4: Full Laboratory Markers (Blood, Urine, Sputum)
-    const renderLabTable = (title: string, data: any[]) => {
+    // 4. Laboratory Markers (Organized by Panels)
+    currentY = (doc as any).lastAutoTable.finalY + 15;
+    
+    const drawLabSection = (title: string, data: any[]) => {
       if (data.length === 0) return;
-      doc.setFontSize(10);
-      doc.text(title, 20, (doc as any).lastAutoTable.finalY + 12);
+      if (currentY > pageHeight - 60) { doc.addPage(); currentY = 20; }
+      
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(37, 99, 235); // Blue-600
+      doc.text(`LABORATORY: ${title.toUpperCase()}`, 20, currentY);
+      
       autoTable(doc, {
-        startY: (doc as any).lastAutoTable.finalY + 16,
+        startY: currentY + 4,
         theme: 'striped',
-        head: [['Parameter', 'Result', 'Unit', 'Reference Range']],
+        head: [['Parameter', 'Result Value', 'Unit', 'Reference Range']],
         body: data.map(r => [r.parameter, r.value, r.unit, r.referenceRange]),
-        styles: { fontSize: 8 }
+        styles: { fontSize: 7 },
+        headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
+        margin: { left: 20, right: 20 }
       });
+      currentY = (doc as any).lastAutoTable.finalY + 10;
     };
 
-    renderLabTable(`LAB: ${t.blood}`, patient.labBlood);
-    renderLabTable(`LAB: ${t.urine}`, patient.labUrine);
-    renderLabTable(`LAB: ${t.sputum}`, patient.labSputum);
+    drawLabSection(t.blood, patient.labBlood);
+    drawLabSection(t.urine, patient.labUrine);
+    drawLabSection(t.sputum, patient.labSputum);
 
-    // Section 5: Primary Neural Finding (AI Result)
+    // 5. AI DIAGNOSTIC IMPRESSION (Primary Result)
+    if (currentY > pageHeight - 100) { doc.addPage(); currentY = 20; }
+    
     doc.setFillColor(37, 99, 235);
-    doc.rect(20, (doc as any).lastAutoTable.finalY + 10, pageWidth - 40, 30, 'F');
+    doc.roundedRect(15, currentY, pageWidth - 30, 45, 4, 4, 'F');
+    
     doc.setTextColor(255, 255, 255);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("PRIMARY NEURAL IMPRESSION", 25, currentY + 12);
+    
+    doc.setFontSize(22);
+    doc.text(result.mainDiagnosis.toUpperCase(), 25, currentY + 28);
+    
     doc.setFontSize(10);
-    doc.text(t.pdfPrimaryFinding || 'PRIMARY NEURAL FINDING:', 25, (doc as any).lastAutoTable.finalY + 20);
-    doc.setFontSize(18);
-    doc.text(result.mainDiagnosis.toUpperCase(), 25, (doc as any).lastAutoTable.finalY + 32);
+    doc.text(`CONFIDENCE INDEX: ${(result.confidenceScore * 100).toFixed(1)}%`, pageWidth - 25, currentY + 12, { align: 'right' });
+    
+    // Severity Badge in PDF
+    const sevColor = result.severity === 'Critical' ? [225, 29, 72] : [245, 158, 11];
+    doc.setFillColor(sevColor[0], sevColor[1], sevColor[2]);
+    doc.roundedRect(pageWidth - 55, currentY + 22, 35, 8, 2, 2, 'F');
+    doc.setFontSize(8);
+    doc.text(`${result.severity.toUpperCase()} RISK`, pageWidth - 37.5, currentY + 27.5, { align: 'center' });
 
-    // Section 6: Action Plan
+    // 6. Clinical Analysis & Action Plan
+    currentY += 55;
     doc.setTextColor(15, 23, 42);
-    doc.setFontSize(12);
-    doc.text(t.pdfActionPlan || 'ACTION PLAN & THERAPEUTICS', 20, (doc as any).lastAutoTable.finalY + 50);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("CLINICAL INTERPRETATION & ACTION PLAN", 20, currentY);
+
     autoTable(doc, {
-      startY: (doc as any).lastAutoTable.finalY + 55,
+      startY: currentY + 5,
       theme: 'plain',
       body: [
-        [t.clinicalInterpretation, result.interpretation],
-        [t.managementProtocol, result.followUp],
-        [t.therapeutics, result.medicationRecs],
-        [t.safetyProtocol, result.safetyWarning]
+        ["Clinical Summary", result.interpretation],
+        ["Management Protocol", result.followUp],
+        ["Therapeutics", result.medicationRecs],
+        ["Differential Diagnosis", result.differentials.map(d => `${d.diagnosis} (${d.icd10}) - ${(d.confidence*100).toFixed(0)}%`).join("\n")]
       ],
-      styles: { fontSize: 8 },
-      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 45 } }
+      styles: { fontSize: 8, cellPadding: 4, font: "helvetica" },
+      columnStyles: { 
+        0: { fontStyle: 'bold', textColor: [37, 99, 235], cellWidth: 45 },
+        1: { textColor: [51, 65, 85] }
+      },
+      didDrawCell: (data) => {
+        if (data.column.index === 0) {
+          doc.setDrawColor(226, 232, 240);
+          doc.line(data.cell.x, data.cell.y, data.cell.x, data.cell.y + data.cell.height);
+        }
+      }
     });
 
-    // Footer
-    const footerY = doc.internal.pageSize.getHeight() - 15;
+    // 7. Footer & Signature Area
+    const footerY = pageHeight - 30;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(20, footerY, pageWidth - 20, footerY);
+    
     doc.setFontSize(7);
     doc.setTextColor(148, 163, 184);
-    doc.text(t.pdfFooter, pageWidth / 2, footerY, { align: 'center' });
+    doc.text(t.pdfFooter, pageWidth / 2, footerY + 10, { align: 'center', maxWidth: pageWidth - 40 });
+    
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.text(`Digitally synthesized by Alcortex Neural Engine v1.2. Page ${doc.internal.getNumberOfPages()}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
 
-    doc.save(`Alcortex_Report_V1_${patient.rmNo}.pdf`);
+    doc.save(`Alcortex_Report_${patient.rmNo}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   const SelectionButton = ({ active, onClick, label }: any) => (
@@ -287,9 +351,26 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
     }
   };
 
+  const StatusStep = ({ id, label, current }: { id: AnalysisStage, label: string, current: AnalysisStage }) => {
+    const isCompleted = (current === 'processing' && id === 'initializing') || 
+                       (current === 'complete' && (id === 'initializing' || id === 'processing')) ||
+                       (current === 'complete' && id === 'complete');
+    const isActive = current === id;
+
+    return (
+      <div className={`flex items-center gap-4 transition-all duration-500 ${isCompleted || isActive ? 'opacity-100' : 'opacity-20'}`}>
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${isCompleted ? 'bg-teal-500 text-white' : isActive ? 'bg-blue-500 text-white animate-pulse' : 'bg-white/10'}`}>
+          {isCompleted ? <CheckCircle size={14} /> : <Circle size={8} fill="currentColor" />}
+        </div>
+        <span className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'text-white' : 'text-slate-400'}`}>
+          {label}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 pb-32 px-4 md:px-0">
-      {/* Visual Stepper */}
       <div className="bg-white p-3 md:p-4 rounded-[28px] md:rounded-[32px] border border-slate-100 shadow-xl flex justify-between items-center relative overflow-hidden">
         <div className="absolute top-0 left-0 h-1 bg-slate-50 w-full">
            <div className="h-full bg-gradient-to-r from-blue-600 to-teal-500 transition-all duration-700" style={{ width: `${(step/4)*100}%` }}></div>
@@ -544,18 +625,17 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                    <div className="flex items-center gap-3 mb-8"><Dna size={20} className="text-teal-400 animate-pulse" /><h4 className="text-lg md:text-xl font-black tracking-tight uppercase">ALCORTEX AI</h4></div>
                    <p className="text-sm opacity-60 mb-10 leading-relaxed font-medium">{t.neuralAnalyzing}</p>
                    
-                   <div className="flex-1 space-y-6">
+                   <div className="flex-1 space-y-8">
+                      <div className="space-y-6">
+                        <StatusStep id="initializing" label={t.statusInitializing} current={analysisStage} />
+                        <StatusStep id="processing" label={t.statusProcessing} current={analysisStage} />
+                        <StatusStep id="complete" label={t.statusComplete} current={analysisStage} />
+                      </div>
+
                       <div className="p-5 md:p-6 bg-white/5 rounded-3xl border border-white/10 space-y-4">
                         <div className="flex justify-between text-[9px] md:text-[10px] font-black uppercase opacity-40"><span>System Integrity</span><span>Stable</span></div>
                         <div className="flex justify-between text-[9px] md:text-[10px] font-black uppercase opacity-40"><span>Markers Found</span><span>{patient.labBlood.length + patient.labUrine.length + patient.labSputum.length}</span></div>
                       </div>
-
-                      {analysisStatus && (
-                        <div className="space-y-3 animate-fade-in">
-                          <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest text-center">{analysisStatus}</p>
-                          <div className="h-1 bg-white/10 rounded-full overflow-hidden"><div className="h-full bg-teal-500 w-1/2 animate-pulse"></div></div>
-                        </div>
-                      )}
 
                       {error && <div className="p-4 md:p-5 bg-rose-500/20 border border-rose-500/50 rounded-2xl text-[10px] font-bold text-rose-300 flex items-center gap-3"><AlertCircle size={14}/> {error}</div>}
                    </div>

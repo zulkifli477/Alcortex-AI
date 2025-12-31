@@ -1,3 +1,4 @@
+
 import { Language } from './types';
 
 export const translations: Record<Language, any> = {
@@ -154,7 +155,10 @@ export const translations: Record<Language, any> = {
     pdfVitalsSummary: "RINGKASAN VITAL & KLINIS",
     pdfPrimaryFinding: "TEMUAN NEURAL UTAMA",
     pdfActionPlan: "RENCANA AKSI & OBAT",
-    pdfFooter: "Dokumen ini adalah laporan dukungan klinis yang dihasilkan komputer. Keputusan klinis akhir harus dibuat oleh profesional medis berlisensi."
+    pdfFooter: "Dokumen ini adalah laporan dukungan klinis yang dihasilkan komputer. Keputusan klinis akhir harus dibuat oleh profesional medis berlisensi.",
+    statusInitializing: "Inisialisasi Jalur Saraf",
+    statusProcessing: "Sintesis Data Klinis",
+    statusComplete: "Analisis Selesai"
   },
   [Language.EN]: {
     dashboard: "Dashboard",
@@ -309,7 +313,10 @@ export const translations: Record<Language, any> = {
     pdfVitalsSummary: "VITAL SIGNS & CLINICAL SUMMARY",
     pdfPrimaryFinding: "PRIMARY NEURAL FINDING",
     pdfActionPlan: "ACTION PLAN & MEDICATIONS",
-    pdfFooter: "This document is a computer-generated clinical support report from Alcortex AI. Final clinical decisions must be made by a licensed medical professional."
+    pdfFooter: "This document is a computer-generated clinical support report from Alcortex AI. Final clinical decisions must be made by a licensed medical professional.",
+    statusInitializing: "Initializing Neural Core",
+    statusProcessing: "Synthesizing Clinical Data",
+    statusComplete: "Analysis Complete"
   },
   [Language.RU]: {
     dashboard: "Панель",
@@ -464,6 +471,9 @@ export const translations: Record<Language, any> = {
     pdfVitalsSummary: "ЖИЗНЕННЫЕ ПОКАЗАТЕЛИ И РЕЗЮМЕ",
     pdfPrimaryFinding: "ОСНОВНОЙ РЕЗУЛЬТАТ",
     pdfActionPlan: "ПЛАН ДЕЙСТВИЙ И ЛЕКАРСТВА",
-    pdfFooter: "Этот документ является компьютерным отчетом поддержки клинических решений Alcortex AI. Окончательные решения должны приниматься врачом."
+    pdfFooter: "Этот документ является компьютерным отчетом поддержки клинических решений Alcortex AI. Окончательные решения должны приниматься врачом.",
+    statusInitializing: "Инициализация нейроядра",
+    statusProcessing: "Синтез клинических данных",
+    statusComplete: "Анализ завершен"
   }
 };

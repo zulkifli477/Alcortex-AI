@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { PatientData, DiagnosisOutput, Language } from "../types";
 
@@ -7,13 +6,14 @@ export const analyzePatientData = async (
   language: Language = Language.EN,
   imageUri?: string
 ): Promise<DiagnosisOutput> => {
-  // Always create instance inside the function for the latest API Key
-  const apiKey = process.env.API_KEY || "";
-  if (!apiKey) {
+  // Guidelines: Always create instance inside the function for the latest API Key
+  // API key must be obtained exclusively from process.env.API_KEY
+  if (!process.env.API_KEY) {
     throw new Error("An API Key must be set when running in a browser. Please select your API key.");
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  // Guidelines: Always use process.env.API_KEY directly in the constructor
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const modelName = "gemini-3-pro-preview";
   
   const labDataString = `
@@ -63,6 +63,7 @@ export const analyzePatientData = async (
       });
     }
 
+    // Guidelines: Use ai.models.generateContent to query GenAI with both the model and prompt
     const response = await ai.models.generateContent({
       model: modelName,
       contents: { parts },
@@ -96,6 +97,7 @@ export const analyzePatientData = async (
       }
     });
 
+    // Guidelines: Use .text property to extract output string
     const text = response.text;
     if (!text) throw new Error("AI response was empty.");
     return JSON.parse(text);

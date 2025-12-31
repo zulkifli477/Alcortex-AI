@@ -1,17 +1,37 @@
-# Alcortex AI - Clinical Diagnostic Suite
+# Alcortex AI - Clinical Diagnostic Suite v1.2
 
-A high-performance medical diagnosis AI platform designed for medical professionals.
+## Arsitektur Proyek
+Pemisahan total antara Frontend dan Backend untuk skalabilitas dan kemudahan deployment.
 
-## Project Structure
-- `/frontend`: React client application.
-- `/backend`: Node.js Express server using TypeScript.
-  - `/src/services`: Contains the OpenAI GPT-4o engine.
-  - `/src/controllers`: API endpoint logic.
+### `/frontend`
+- **React 19 + Vite**
+- Antarmuka Medis Profesional (Tailwind CSS)
+- Manajemen EMR di sisi klien melalui LocalStorage
+- Analitik didukung oleh Alcortex Neural Engine (melalui Backend Proxy)
 
-## AI Engine
-Now exclusively using **OpenAI GPT-4o** for clinical synthesis and visual analysis. All Google Gemini dependencies have been removed for project consistency and performance.
+### `/backend`
+- **Node.js + Express + TypeScript**
+- Integrasi Alcortex Neural Synthesis
+- Lapisan Persistensi MySQL
+- Penanganan Data Medis yang Aman
 
-## Getting Started
-1. Configure `.env` in the `/backend` folder.
-2. Run backend: `npm run server`
-3. Run frontend: `npm run dev`
+## Instalasi & Menjalankan
+
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Backend
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+## Keamanan
+- Tidak ada API Key yang disimpan di sisi Frontend.
+- Proxy backend menangani semua pemrosesan AI secara aman.
+- **Seluruh dependensi dan service pihak ketiga diabstraksi melalui Alcortex proprietary layers.**

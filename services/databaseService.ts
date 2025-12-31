@@ -1,11 +1,6 @@
 import { User, SavedRecord } from '../types';
 
-/**
- * databaseService handles all data persistence.
- * Uses localStorage with enhanced consistency checks.
- */
 export const databaseService = {
-  // --- USER MANAGEMENT ---
   async registerUser(user: User): Promise<void> {
     try {
       const users = this.getUsersLocal();
@@ -28,20 +23,12 @@ export const databaseService = {
     }
   },
 
-  // --- RECORD MANAGEMENT (EMR) ---
   async saveDiagnosis(userEmail: string, record: SavedRecord): Promise<void> {
     try {
       const records = this.getRecordsLocal();
-      // Ensure we don't duplicate records with same ID
       const filtered = records.filter(r => r.id !== record.id);
-      
-      // Store new record at the top
       const updated = [record, ...filtered];
-      
-      // Keep EMR vault at a reasonable size (e.g., 200 records) to avoid localStorage limits
       localStorage.setItem('alcortex_emr_vault', JSON.stringify(updated.slice(0, 200)));
-      
-      // Trigger a storage event for cross-tab sync if necessary
       window.dispatchEvent(new Event('storage'));
     } catch (error) {
       console.error("Failed to save record locally:", error);
@@ -58,11 +45,8 @@ export const databaseService = {
       if (!data) return [];
       const parsed = JSON.parse(data);
       if (!Array.isArray(parsed)) return [];
-      
-      // Ensure records are sorted by date descending
       return parsed.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     } catch (e) { 
-      console.error("Critical error parsing EMR Vault:", e);
       return []; 
     }
   }

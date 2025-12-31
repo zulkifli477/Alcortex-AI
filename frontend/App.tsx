@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Language, User, SavedRecord } from './types';
+import { User, SavedRecord } from './types';
 import { translations } from './translations';
 import Sidebar from './components/Sidebar';
-import Dashboard from '../pages/Dashboard';
+import Dashboard from './pages/Dashboard';
 import DiagnosisForm from './pages/DiagnosisForm';
-import AuthPage from '../pages/AuthPage';
-import SettingsPage from '../pages/SettingsPage';
+import AuthPage from './pages/AuthPage';
+import SettingsPage from './pages/SettingsPage';
 import ImagingPage from './pages/ImagingPage';
-import EMRPage from '../pages/EMRPage';
+import EMRPage from './pages/EMRPage';
 import SplashScreen from './components/SplashScreen';
 import { databaseService } from './services/databaseService';
 import { Menu } from 'lucide-react';
@@ -50,7 +50,10 @@ const App: React.FC = () => {
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
-        onLogout={() => setUser(null)} 
+        onLogout={() => {
+          setUser(null);
+          localStorage.removeItem('alcortex_user');
+        }} 
         language={user.language}
         isOpen={sidebarOpen}
         setIsOpen={setSidebarOpen}
@@ -74,8 +77,8 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
              <div className="hidden md:block text-right">
-                <p className="text-[10px] font-black text-slate-800 leading-none">ALCORTEX v1.1</p>
-                <p className="text-[8px] font-bold text-teal-500 uppercase tracking-tighter">GPT-4o Engine Active</p>
+                <p className="text-[10px] font-black text-slate-800 leading-none">ALCORTEX AI v1</p>
+                <p className="text-[8px] font-bold text-teal-500 uppercase tracking-tighter">Proprietary AI Engine Active</p>
              </div>
              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-teal-500 flex items-center justify-center text-white font-black shadow-lg">
                 {user.name[0]}

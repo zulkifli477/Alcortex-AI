@@ -1,67 +1,59 @@
+
 import express from 'express';
 import mysql from 'mysql2';
 import cors from 'cors';
-import { config } from './config/env';
-import { analyzePatient } from './controllers/ai.controller';
+import dotenv from 'dotenv';
+import { GeminiService } from './services/gemini.service';
+
+dotenv.config();
 
 const app = express();
-const PORT = config.port;
+const PORT = process.env.PORT || 5000;
+const aiService = new GeminiService();
 
-app.use(cors());
-/**
- * Explicit cast to any to resolve potential Type mismatch between express.json 
- * and RequestHandler in some TypeScript/Express version combinations.
- */
+// Middleware
+// Fix: Use 'as any' casting to resolve type mismatch error between cors middleware return type and express app.use expectation.
+app.use(cors({
+  origin: '*', // Di produksi, ganti dengan domain frontend Anda
+  methods: ['GET', 'POST']
+}) as any);
+// Fix: Use 'as any' casting to bypass type mismatch error where express.json() is mistaken for a PathParams instead of a middleware.
 app.use(express.json({ limit: '50mb' }) as any);
 
-// Database Connection Pool
-const db = mysql.createPool({
-    ...config.db,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
-
-db.getConnection((err, connection) => {
-    if (err) {
-        console.error('Database connection failed:', err.message);
-    } else {
-        console.log('Connected to MySQL Database (Alcortex)');
-        connection.release();
-    }
-});
+// Database Connection (Fallback to LocalStorage/Mock if DB_HOST is missing)
+let db: any = null;
+if (process.env.DB_HOST) {
+    db = mysql.createPool({
+        host: process.env.DB_HOST,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME,
+        waitForConnections: true,
+        connectionLimit: 10
+    });
+}
 
 // --- API ROUTES ---
-app.post('/api/analyze', analyzePatient);
 
-app.post('/api/users/register', (req, res) => {
-    const { name, professionId, language, email } = req.body;
-    const query = 'INSERT INTO users (name, professionId, language, email) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE name = ?, professionId = ?, language = ?';
-    db.execute(query, [name, professionId, language, email, name, professionId, language], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ message: 'User registered successfully' });
-    });
-});
-
-app.get('/api/records', (req, res) => {
-    db.query('SELECT * FROM records ORDER BY created_at DESC', (err, results: any) => {
-        if (err) return res.status(500).json({ error: err.message });
-        const formatted = results.map((row: any) => ({
-            id: row.recordId,
-            date: row.created_at,
-            patient: JSON.parse(row.patientData),
-            analysis: JSON.parse(row.analysisResult)
-        }));
-        res.json(formatted);
-    });
+app.post('/api/analyze', async (req, res) => {
+    try {
+        const { patient, language } = req.body;
+        if (!patient) return res.status(400).json({ error: "Missing patient data" });
+        
+        const result = await aiService.analyzePatient(patient, language || 'English');
+        res.json(result);
+    } catch (error: any) {
+        console.error("AI Controller Error:", error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.get('/api/health', (req, res) => res.json({ 
     status: 'OK', 
-    engine: 'Alcortex Neural Engine Ready',
+    engine: 'Alcortex AI v1 Active',
     timestamp: new Date().toISOString()
 }));
 
 app.listen(PORT, () => {
-    console.log(`Alcortex Backend running on http://localhost:${PORT}`);
+    console.log(`Alcortex Backend running on port ${PORT}`);
 });

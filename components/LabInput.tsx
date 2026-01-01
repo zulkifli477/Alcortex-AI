@@ -113,9 +113,18 @@ const LabInput: React.FC<LabInputProps> = ({ title, results, setResults, suggest
     newResults[index][field] = val;
 
     // Auto-Populate Unit and Range when parameter is selected from Master Data
-    if (field === 'parameter' && LAB_MASTER_DATA[val]) {
-      newResults[index].unit = LAB_MASTER_DATA[val].unit;
-      newResults[index].referenceRange = LAB_MASTER_DATA[val].range;
+    if (field === 'parameter') {
+      // Find a case-insensitive match in our master data keys
+      const matchedKey = Object.keys(LAB_MASTER_DATA).find(
+        key => key.toLowerCase() === val.toLowerCase()
+      );
+
+      if (matchedKey) {
+        // Snap to original casing and fill associated metadata
+        newResults[index].parameter = matchedKey;
+        newResults[index].unit = LAB_MASTER_DATA[matchedKey].unit;
+        newResults[index].referenceRange = LAB_MASTER_DATA[matchedKey].range;
+      }
     }
 
     setResults(newResults);

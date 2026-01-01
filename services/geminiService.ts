@@ -6,15 +6,14 @@ export const analyzePatientData = async (
   language: Language = Language.EN,
   imageUri?: string
 ): Promise<DiagnosisOutput> => {
-  // Guidelines: Always create instance inside the function for the latest API Key
-  // API key must be obtained exclusively from process.env.API_KEY
+  // Always obtain API Key from process.env.API_KEY
   if (!process.env.API_KEY) {
-    throw new Error("An API Key must be set when running in a browser. Please select your API key.");
+    throw new Error("Missing API Key. Ensure process.env.API_KEY is configured.");
   }
 
-  // Guidelines: Always use process.env.API_KEY directly in the constructor
+  // Guidelines: Instantiate client right before use
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const modelName = "gemini-3-pro-preview";
+  const modelName = 'gemini-3-pro-preview';
   
   const labDataString = `
     - BLOOD PANEL: ${JSON.stringify(patient.labBlood)}
@@ -47,7 +46,7 @@ export const analyzePatientData = async (
     3. Clinical Interpretation (Linking labs to symptoms).
     4. Follow-up plan & Medication recommendations.
     5. Safety Warnings.
-    6. Return ONLY valid JSON.
+    6. Return ONLY valid JSON according to the required schema.
   `;
 
   try {
@@ -63,7 +62,7 @@ export const analyzePatientData = async (
       });
     }
 
-    // Guidelines: Use ai.models.generateContent to query GenAI with both the model and prompt
+    // Guidelines: Use generateContent with config.responseSchema
     const response = await ai.models.generateContent({
       model: modelName,
       contents: { parts },
@@ -92,24 +91,22 @@ export const analyzePatientData = async (
             followUp: { type: Type.STRING },
             medicationRecs: { type: Type.STRING }
           },
-          required: ["mainDiagnosis", "differentials", "severity", "confidenceScore", "interpretation", "safetyWarning", "followUp", "medicationRecs"]
+          required: [
+            "mainDiagnosis", "differentials", "severity", 
+            "confidenceScore", "interpretation", "safetyWarning", 
+            "followUp", "medicationRecs"
+          ]
         }
       }
     });
 
-    // Guidelines: Use .text property to extract output string
+    // Guidelines: Access response.text property directly
     const text = response.text;
-    if (!text) throw new Error("AI response was empty.");
+    if (!text) throw new Error("Neural Engine failed to return a report.");
+    
     return JSON.parse(text);
   } catch (error: any) {
-    console.error("Gemini Execution Error:", error);
-    
-    // Handle specific AI Studio error for missing project key selection
-    if (error.message?.includes("Requested entity was not found") && typeof window.aistudio !== 'undefined') {
-      await window.aistudio.openSelectKey();
-      throw new Error("Session expired or project missing. Please re-select your API key and try again.");
-    }
-    
-    throw new Error(error.message || "AI Synthesis failed. Please check network and API configuration.");
+    console.error("AI Service Execution Error:", error);
+    throw new Error(error.message || "AI Synthesis failed. Check configuration.");
   }
 };

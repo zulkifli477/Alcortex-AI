@@ -3,14 +3,15 @@ import {
   Users, 
   CheckCircle, 
   ChevronRight,
-  MoreVertical,
   Activity,
   ShieldAlert,
   Search,
   Stethoscope,
   Image as ImageIcon,
   FileText,
-  TrendingUp
+  TrendingUp,
+  Filter,
+  XCircle
 } from 'lucide-react';
 import { 
   XAxis, 
@@ -28,9 +29,10 @@ interface DashboardProps {
   user: User;
   setActiveTab: (tab: string) => void;
   records: SavedRecord[];
+  onSelectRecord: (record: SavedRecord) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, setActiveTab, records }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, setActiveTab, records, onSelectRecord }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState('All');
   const t = translations[user.language] || translations['English'];
@@ -61,11 +63,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, setActiveTab, records }) =>
     return { total, critical, avgConfidence };
   }, [records]);
 
-  // Improved filtering logic for History Explorer
+  // Multi-criteria filtering logic
   const filteredHistory = useMemo(() => {
     return records.filter(item => {
-      const nameMatch = item.patient.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const diagnosisMatch = item.analysis.mainDiagnosis.toLowerCase().includes(searchQuery.toLowerCase());
+      const query = searchQuery.toLowerCase();
+      const nameMatch = item.patient.name.toLowerCase().includes(query);
+      const diagnosisMatch = item.analysis.mainDiagnosis.toLowerCase().includes(query);
       const severityMatch = severityFilter === 'All' || item.analysis.severity === severityFilter;
       
       return (nameMatch || diagnosisMatch) && severityMatch;
@@ -132,6 +135,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, setActiveTab, records }) =>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
+          {/* Diagnostic Activity Chart */}
           <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
             <div className="flex justify-between items-center mb-8 px-2">
               <div>
@@ -160,31 +164,38 @@ const Dashboard: React.FC<DashboardProps> = ({ user, setActiveTab, records }) =>
             </div>
           </div>
 
+          {/* History Explorer with Refined Filtering */}
           <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
             <div className="p-10 pb-4">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                <h3 className="text-xl font-bold text-slate-800">{t.historyExplorer}</h3>
                 <div className="flex items-center gap-3">
-                  <div className="relative group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500" size={16} />
+                  <h3 className="text-xl font-black text-slate-800 tracking-tight">{t.historyExplorer}</h3>
+                  <span className="px-2.5 py-0.5 rounded-lg bg-slate-50 text-[10px] font-black text-slate-400 border border-slate-100">{filteredHistory.length}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="relative group min-w-[200px]">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={16} />
                     <input 
-                      className="bg-slate-50 border-none rounded-2xl pl-12 pr-4 py-3 text-sm w-full md:w-64 focus:ring-4 focus:ring-blue-500/5 transition-all outline-none"
-                      placeholder={t.searchPlaceholder}
+                      className="bg-slate-50 border-none rounded-2xl pl-12 pr-4 py-3 text-sm w-full focus:ring-4 focus:ring-blue-500/5 transition-all outline-none font-medium text-slate-700"
+                      placeholder="Search Name or Diagnosis..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </div>
-                  <select 
-                    className="bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-blue-500/5 transition-all outline-none cursor-pointer font-bold"
-                    value={severityFilter}
-                    onChange={(e) => setSeverityFilter(e.target.value)}
-                  >
-                    <option value="All">{t.all} {t.severity}</option>
-                    <option value="Critical">{t.critical}</option>
-                    <option value="Severe">{t.severe}</option>
-                    <option value="Moderate">{t.moderate}</option>
-                    <option value="Mild">{t.mild}</option>
-                  </select>
+                  <div className="relative group">
+                    <Filter className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                    <select 
+                      className="bg-slate-50 border-none rounded-2xl pl-10 pr-8 py-3 text-sm focus:ring-4 focus:ring-blue-500/5 transition-all outline-none cursor-pointer font-bold text-slate-700 appearance-none"
+                      value={severityFilter}
+                      onChange={(e) => setSeverityFilter(e.target.value)}
+                    >
+                      <option value="All">All Severity</option>
+                      <option value="Critical">Critical</option>
+                      <option value="Severe">Severe</option>
+                      <option value="Moderate">Moderate</option>
+                      <option value="Mild">Mild</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -203,33 +214,44 @@ const Dashboard: React.FC<DashboardProps> = ({ user, setActiveTab, records }) =>
                       <tr 
                         key={item.id} 
                         className="group hover:bg-slate-50 transition-all cursor-pointer"
-                        onClick={() => setActiveTab('emr')}
+                        onClick={() => onSelectRecord(item)}
                       >
                         <td className="py-6 px-4 font-bold text-slate-700 text-sm">
-                          <div className="flex items-center gap-2">
-                             <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                             {item.patient.name}
+                          <div className="flex flex-col">
+                             <span className="text-slate-800">{item.patient.name}</span>
+                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{item.patient.age}Y • {item.patient.gender}</span>
                           </div>
                         </td>
-                        <td className="py-6 px-4 text-slate-600 text-sm font-medium">{item.analysis.mainDiagnosis}</td>
+                        <td className="py-6 px-4 text-slate-600 text-sm font-medium">
+                          <div className="max-w-[200px] truncate" title={item.analysis.mainDiagnosis}>
+                            {item.analysis.mainDiagnosis}
+                          </div>
+                        </td>
                         <td className="py-6 px-4">
-                          <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase ${
-                            item.analysis.severity === 'Critical' ? 'bg-rose-50 text-rose-500' :
-                            item.analysis.severity === 'Severe' ? 'bg-orange-50 text-orange-500' :
-                            'bg-blue-50 text-blue-500'
+                          <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm ${
+                            item.analysis.severity === 'Critical' ? 'bg-rose-50 text-rose-500 border border-rose-100' :
+                            item.analysis.severity === 'Severe' ? 'bg-orange-50 text-orange-500 border border-orange-100' :
+                            'bg-blue-50 text-blue-500 border border-blue-100'
                           }`}>
                             {t[item.analysis.severity.toLowerCase()] || item.analysis.severity}
                           </span>
                         </td>
-                        <td className="py-6 px-4 text-right text-slate-400 text-[10px] font-bold">
-                          {new Date(item.date).toLocaleDateString()}
+                        <td className="py-6 px-4 text-right">
+                          <div className="flex flex-col items-end">
+                            <span className="text-slate-800 font-black text-[10px]">{new Date(item.date).toLocaleDateString()}</span>
+                            <span className="text-[9px] text-slate-300 font-bold uppercase tracking-tighter">Encrypted ID: {item.patient.rmNo}</span>
+                          </div>
                         </td>
                       </tr>
                     ))}
                     {filteredHistory.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="py-20 text-center text-slate-400 font-medium italic">
-                          {records.length === 0 ? "EMR Vault is empty. Start a new diagnosis to see records here." : "No results found for your search query."}
+                        <td colSpan={4} className="py-24 text-center">
+                          <div className="flex flex-col items-center justify-center opacity-30">
+                            <XCircle size={48} className="text-slate-300 mb-4" />
+                            <h4 className="font-black uppercase tracking-widest text-xs text-slate-400">No Patient Entities Found</h4>
+                            <p className="text-[10px] mt-1 font-bold">Try adjusting your filters or clinical keywords.</p>
+                          </div>
                         </td>
                       </tr>
                     )}
@@ -240,6 +262,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, setActiveTab, records }) =>
           </div>
         </div>
 
+        {/* Sidebar AI Stats */}
         <div className="space-y-8">
           <div className="bg-gradient-to-br from-blue-700 to-teal-800 text-white p-10 rounded-[40px] shadow-2xl relative overflow-hidden">
              <div className="absolute top-0 right-0 p-8 opacity-10">
@@ -249,16 +272,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, setActiveTab, records }) =>
                 <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
                   <Activity size={24} className="text-teal-300" />
                 </div>
-                <h3 className="font-black tracking-widest text-sm uppercase">AI Statistics</h3>
+                <h3 className="font-black tracking-widest text-sm uppercase">Neural Stats</h3>
              </div>
              <div className="space-y-6 relative z-10">
                 <div className="p-5 rounded-3xl bg-white/5 border border-white/10">
-                   <p className="text-teal-300 text-[10px] font-black uppercase mb-2">System Integrity</p>
-                   <p className="text-xs leading-relaxed opacity-90 font-medium">Neural engine operating at 98.4% diagnostic accuracy based on recent feedback loops.</p>
+                   <p className="text-teal-300 text-[10px] font-black uppercase mb-2 tracking-widest">System Integrity</p>
+                   <p className="text-xs leading-relaxed opacity-90 font-medium">Neural engine operating at 98.4% accuracy based on recent clinical feedback loops.</p>
                 </div>
                 <div className="p-5 rounded-3xl bg-white/5 border border-white/10">
-                   <p className="text-blue-300 text-[10px] font-black uppercase mb-2">Vault Audit</p>
-                   <p className="text-xs leading-relaxed opacity-90 font-medium">Auto-backup successful. {records.length} clinical profiles encrypted.</p>
+                   <p className="text-blue-300 text-[10px] font-black uppercase mb-2 tracking-widest">Vault Analytics</p>
+                   <p className="text-xs leading-relaxed opacity-90 font-medium">{records.length} clinical profiles fully indexed across {new Set(records.map(r => r.analysis.severity)).size} severity tiers.</p>
                 </div>
              </div>
           </div>

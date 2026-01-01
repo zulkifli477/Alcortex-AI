@@ -1,16 +1,15 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
+// Fixed path to point correctly to root types.ts
 import { PatientData, DiagnosisOutput } from "../../types";
 
 export class GeminiService {
-  private ai: GoogleGenAI;
-
-  constructor() {
-    // Guideline: Always use process.env.API_KEY directly for initialization
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  }
+  // Guidelines: Always create instance inside the function for the latest API Key
+  // GUIDELINE FIX: Removed class-level ai property to ensure per-call initialization.
 
   async analyzePatient(patient: PatientData, language: string): Promise<DiagnosisOutput> {
+    // Guidelines: Initialization must use a named parameter {apiKey: ...}
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const model = 'gemini-3-pro-preview';
 
     // Stringify lab data for the prompt
@@ -53,9 +52,9 @@ export class GeminiService {
     `;
 
     try {
-      const response = await this.ai.models.generateContent({
+      // Guidelines: Use ai.models.generateContent to query GenAI with both the model name and prompt.
+      const response = await ai.models.generateContent({
         model,
-        // Using simple string content for text-only prompt
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -87,7 +86,7 @@ export class GeminiService {
         }
       });
 
-      // Extract text output using the text property
+      // Guidelines: Use .text property (not a method) to extract output string
       const jsonStr = response.text || "{}";
       return JSON.parse(jsonStr);
     } catch (error) {

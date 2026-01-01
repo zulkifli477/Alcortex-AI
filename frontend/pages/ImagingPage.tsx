@@ -4,7 +4,8 @@ import {
   Image as ImageIcon, Upload, Loader2, AlertTriangle, Download, CheckCircle2
 } from 'lucide-react';
 import { apiService } from '../services/api';
-import { PatientData, DiagnosisOutput, User } from '../../types';
+// Corrected relative path to point to frontend/types.ts (one level up from pages/)
+import { PatientData, DiagnosisOutput, User } from '../types';
 import { translations } from '../../translations';
 import AlcortexLogo from '../../components/Logo';
 

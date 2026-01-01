@@ -1,37 +1,36 @@
-# Alcortex AI - Clinical Diagnostic Suite v1.2
+# ALCORTEX AI - v1.2.0 (Clean Architecture)
 
-## Arsitektur Proyek
-Pemisahan total antara Frontend dan Backend untuk skalabilitas dan kemudahan deployment.
+Aplikasi diagnosis medis presisi berbasis arsitektur sub-direktori.
 
-### `/frontend`
-- **React 19 + Vite**
-- Antarmuka Medis Profesional (Tailwind CSS)
-- Manajemen EMR di sisi klien melalui LocalStorage
-- Analitik didukung oleh Alcortex Neural Engine (melalui Backend Proxy)
+## 🛠️ Cara Menjalankan di GitHub Codespaces
 
-### `/backend`
-- **Node.js + Express + TypeScript**
-- Integrasi Alcortex Neural Synthesis
-- Lapisan Persistensi MySQL
-- Penanganan Data Medis yang Aman
+Proyek ini tidak menjalankan build otomatis di root untuk menghindari error. Ikuti langkah berikut:
 
-## Instalasi & Menjalankan
-
-### Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### Backend
+### 1. Setup Backend
 ```bash
 cd backend
 npm install
 npm run dev
 ```
 
-## Keamanan
-- Tidak ada API Key yang disimpan di sisi Frontend.
-- Proxy backend menangani semua pemrosesan AI secara aman.
-- **Seluruh dependensi dan service pihak ketiga diabstraksi melalui Alcortex proprietary layers.**
+### 2. Setup Frontend (Buka Terminal Baru)
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## 🌐 Deployment
+
+### Netlify
+Proyek sudah dikonfigurasi dengan `netlify.toml`. Cukup hubungkan repositori ke Netlify, dan pastikan:
+- **Base directory**: `frontend`
+- **Build command**: `npm run build`
+- **Publish directory**: `frontend/dist`
+
+### API Configuration
+Pastikan set `VITE_API_URL` di environment variable Netlify mengarah ke URL backend Anda.
+
+## 🛡️ Struktur
+- `/frontend`: React + Vite (UI)
+- `/backend`: Node.js + Express (AI Engine)

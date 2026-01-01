@@ -28,7 +28,8 @@ import {
   CheckCircle
 } from 'lucide-react';
 import LabInput from '../../components/LabInput';
-import { PatientData, DiagnosisOutput, User, SavedRecord, Vitals, SmokingLevel, AlcoholLevel } from '../../types';
+// Corrected relative path to point to frontend/types.ts
+import { PatientData, DiagnosisOutput, User, SavedRecord, Vitals, SmokingLevel, AlcoholLevel } from '../types';
 import { translations } from '../../translations';
 import { apiService } from '../services/api';
 import { jsPDF } from 'jspdf';
@@ -118,10 +119,12 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
   }, [patient.dob]);
 
   const handleVitalChange = (key: keyof Vitals, val: string) => {
-    const isDecimal = ['temperature', 'weight', 'height'].includes(key);
+    // Fix: cast key to string for the array includes check.
+    const isDecimal = ['temperature', 'weight', 'height'].includes(key as string);
     const regex = isDecimal ? /^[0-9]*\.?[0-9]*$/ : /^[0-9]*$/;
     if (val === '' || regex.test(val)) {
-      setPatient(p => ({ ...p, vitals: { ...p.vitals, [key]: val } }));
+      // Fix: cast key to any for the computed property name to prevent symbol/number type error.
+      setPatient(p => ({ ...p, vitals: { ...p.vitals, [key as any]: val } }));
     }
   };
 
@@ -323,7 +326,8 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
     
     doc.setFontSize(8);
     doc.setFont("helvetica", "italic");
-    doc.text(`Digitally synthesized by Alcortex Neural Engine v1.2. Page ${doc.internal.getNumberOfPages()}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+    // Fix: Using public method doc.getNumberOfPages() instead of accessing internal properties to avoid type errors.
+    doc.text(`Digitally synthesized by Alcortex Neural Engine v1.2. Page ${doc.getNumberOfPages()}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
 
     doc.save(`Alcortex_Report_${patient.rmNo}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
@@ -371,6 +375,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 pb-32 px-4 md:px-0">
+      {/* Visual Stepper */}
       <div className="bg-white p-3 md:p-4 rounded-[28px] md:rounded-[32px] border border-slate-100 shadow-xl flex justify-between items-center relative overflow-hidden">
         <div className="absolute top-0 left-0 h-1 bg-slate-50 w-full">
            <div className="h-full bg-gradient-to-r from-blue-600 to-teal-500 transition-all duration-700" style={{ width: `${(step/4)*100}%` }}></div>
@@ -645,7 +650,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                     disabled={loading} 
                     className="w-full bg-gradient-to-r from-blue-600 to-teal-500 py-5 md:py-6 rounded-[20px] md:rounded-3xl font-black uppercase text-xs tracking-[0.3em] md:tracking-[0.4em] flex items-center justify-center gap-4 shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 mt-10"
                    >
-                     {loading ? <Loader2 className="animate-spin" /> : <Zap size={18} fill="currentColor" />}
+                     {loading ? <Loader2 className="animate-spin" /> : <AlcortexLogo size={20} />}
                      {loading ? t.processing : t.runAnalysis}
                    </button>
                    <button onClick={() => setStep(2)} className="w-full py-4 text-[9px] font-black uppercase tracking-widest opacity-30 hover:opacity-100 transition-all">{t.backToHistory}</button>

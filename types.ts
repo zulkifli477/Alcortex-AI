@@ -1,15 +1,19 @@
-
+// Standard clinical data structures for Alcortex AI
 export enum Language {
   ID = 'Bahasa Indonesia',
   EN = 'English',
   RU = 'Russian'
 }
 
+export type AuthProvider = 'Email' | 'Google' | 'Apple' | 'Microsoft';
+
 export interface User {
   name: string;
   professionId: string;
   language: Language;
   email: string;
+  provider: AuthProvider;
+  token?: string; // Simulated JWT or Session Token
 }
 
 export interface LabResult {

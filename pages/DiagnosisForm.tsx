@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   User as UserIcon, 
@@ -28,19 +27,19 @@ import {
   Circle,
   CheckCircle
 } from 'lucide-react';
-import LabInput from '../../components/LabInput';
-import { PatientData, DiagnosisOutput, User, SavedRecord, Vitals, SmokingLevel, AlcoholLevel } from '../../types';
-import { translations } from '../../translations';
-import { apiService } from '../services/api';
+import LabInput from '../components/LabInput';
+import { PatientData, DiagnosisOutput, User, SavedRecord, Vitals, SmokingLevel, AlcoholLevel } from '../types';
+import { translations } from '../translations';
+import { analyzePatientData } from '../services/geminiService';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import AlcortexLogo from '../../components/Logo';
+import AlcortexLogo from '../components/Logo';
 
 const BLOOD_SUGGESTIONS = [
   'Hemoglobin', 'Hematocrit', 'WBC Count', 'Platelet Count', 'RBC Count', 'MCV', 'MCH', 'MCHC',
   'Neutrophils', 'Lymphocytes', 'Monocytes', 'Eosinophils', 'Basophils', 'CRP', 'HbA1c',
   'Blood Glucose (Random)', 'Blood Glucose (Fasting)', 'Creatinine', 'Urea', 'Uric Acid',
-  'Sodium', 'Potassium', 'Chloride', 'ALT (SGPT)', 'AST (SGOT)', 'Bilirubin Total', 'Albumin'
+  'Sodium', 'Potassium', 'Chloride', 'ALT (SGPT)', 'AST (SGPT)', 'Bilirubin Total', 'Albumin'
 ];
 
 const URINE_SUGGESTIONS = [
@@ -119,10 +118,10 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
   }, [patient.dob]);
 
   const handleVitalChange = (key: keyof Vitals, val: string) => {
-    const isDecimal = ['temperature', 'weight', 'height'].includes(key);
+    const isDecimal = ['temperature', 'weight', 'height'].includes(key as string);
     const regex = isDecimal ? /^[0-9]*\.?[0-9]*$/ : /^[0-9]*$/;
     if (val === '' || regex.test(val)) {
-      setPatient(p => ({ ...p, vitals: { ...p.vitals, [key]: val } }));
+      setPatient(p => ({ ...p, vitals: { ...p.vitals, [key as any]: val } }));
     }
   };
 
@@ -132,16 +131,14 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
     setAnalysisStage('initializing');
 
     try {
-      // Simulate initialization phase
       await new Promise(r => setTimeout(r, 1200));
       setAnalysisStage('processing');
 
-      const analysis = await apiService.analyzePatient(patient, user.language);
+      const analysis = await analyzePatientData(patient, user.language);
       
       setAnalysisStage('complete');
       setResult(analysis);
       
-      // Briefly show complete state
       await new Promise(r => setTimeout(r, 800));
       
       await onSaveRecord({ id: `ALCOR-${Date.now()}`, date: new Date().toISOString(), patient, analysis });
@@ -319,7 +316,6 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 pb-32 px-4 md:px-0">
-      {/* Visual Stepper */}
       <div className="bg-white p-3 md:p-4 rounded-[28px] md:rounded-[32px] border border-slate-100 shadow-xl flex justify-between items-center relative overflow-hidden">
         <div className="absolute top-0 left-0 h-1 bg-slate-50 w-full">
            <div className="h-full bg-gradient-to-r from-blue-600 to-teal-500 transition-all duration-700" style={{ width: `${(step/4)*100}%` }}></div>
@@ -594,7 +590,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                     disabled={loading} 
                     className="w-full bg-gradient-to-r from-blue-600 to-teal-500 py-5 md:py-6 rounded-[20px] md:rounded-3xl font-black uppercase text-xs tracking-[0.3em] md:tracking-[0.4em] flex items-center justify-center gap-4 shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 mt-10"
                    >
-                     {loading ? <Loader2 className="animate-spin" /> : <Zap size={18} fill="currentColor" />}
+                     {loading ? <Loader2 className="animate-spin" /> : <AlcortexLogo size={20} />}
                      {loading ? t.processing : t.runAnalysis}
                    </button>
                    <button onClick={() => setStep(2)} className="w-full py-4 text-[9px] font-black uppercase tracking-widest opacity-30 hover:opacity-100 transition-all">{t.backToHistory}</button>
@@ -605,8 +601,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
 
         {step === 4 && result && (
           <div className="space-y-8 md:space-y-10">
-             {/* Main Result Card */}
-             <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-8 md:p-12 rounded-[40px] shadow-2xl relative overflow-hidden text-white border border-white/5">
+             <div className="bg-white p-8 md:p-12 rounded-[40px] shadow-2xl relative overflow-hidden text-white border border-white/5">
                 <div className="absolute top-0 right-0 p-20 opacity-5 pointer-events-none"><AlcortexLogo size={400} /></div>
                 
                 <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12 relative z-10">
@@ -652,7 +647,6 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
              
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-10">
                 <div className="lg:col-span-2 space-y-8 md:space-y-10">
-                   {/* Narrative Findings */}
                    <div className="bg-white p-10 md:p-12 rounded-[48px] shadow-xl border border-slate-100 space-y-10 relative group overflow-hidden">
                       <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-bl-[100px] -mr-16 -mt-16 transition-all group-hover:bg-blue-50"></div>
                       <div className="flex items-center gap-4 relative z-10">
@@ -685,7 +679,6 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                 </div>
 
                 <div className="space-y-8">
-                   {/* Differential Diagnostics - Analytical View */}
                    <div className="bg-white p-10 rounded-[48px] shadow-2xl border border-slate-100 flex flex-col h-full">
                       <div className="flex justify-between items-center mb-10">
                         <div className="flex items-center gap-3">
@@ -713,7 +706,6 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ user, onSaveRecord }) => 
                                </div>
                              </div>
 
-                             {/* Confidence Progress Bar */}
                              <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden mb-2 border border-slate-100">
                                 <div 
                                   className={`h-full transition-all duration-1000 ease-out delay-200 ${

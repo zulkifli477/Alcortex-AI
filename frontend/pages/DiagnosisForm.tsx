@@ -27,14 +27,14 @@ import {
   Circle,
   CheckCircle
 } from 'lucide-react';
-import LabInput from '../../components/LabInput';
+import LabInput from '../components/LabInput';
 // Corrected relative path to point to frontend/types.ts
 import { PatientData, DiagnosisOutput, User, SavedRecord, Vitals, SmokingLevel, AlcoholLevel } from '../types';
 import { translations } from '../translations';
 import { apiService } from '../services/api';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import AlcortexLogo from '../../components/Logo';
+import AlcortexLogo from '../components/Logo';
 import { analyzePatientData } from '../utils/analyzePatientData';
 
 const BLOOD_SUGGESTIONS = [

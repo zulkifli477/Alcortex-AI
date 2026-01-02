@@ -7,7 +7,7 @@ import { apiService } from '../services/api';
 // Corrected relative path to point to frontend/types.ts (one level up from pages/)
 import { PatientData, DiagnosisOutput, User } from '../types';
 import { translations } from '../translations';
-import AlcortexLogo from '../../components/Logo';
+import AlcortexLogo from '../components/Logo';
 
 const ImagingPage: React.FC<{ user: User }> = ({ user }) => {
   const [loading, setLoading] = useState(false);

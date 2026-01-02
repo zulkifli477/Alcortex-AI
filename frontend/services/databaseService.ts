@@ -1,53 +1,56 @@
-import { User, SavedRecord } from '../types';
+import { SavedRecord } from '../types';
+
+const STORAGE_KEY = 'alcortex_records';
+
+const delay = (ms = 250) => new Promise(res => setTimeout(res, ms));
 
 export const databaseService = {
-  async registerUser(user: User): Promise<void> {
+  async getRecords(): Promise<SavedRecord[]> {
+    await delay(200);
     try {
-      const users = this.getUsersLocal();
-      const exists = users.find(u => u.email === user.email);
-      if (!exists) {
-        users.push(user);
-        localStorage.setItem('alcortex_db_users', JSON.stringify(users));
-      }
-    } catch (error) {
-      console.error("Storage error:", error);
-    }
-  },
-
-  getUsersLocal(): User[] {
-    try {
-      const data = localStorage.getItem('alcortex_db_users');
-      return data ? JSON.parse(data) : [];
-    } catch (e) { 
-      return []; 
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      return JSON.parse(raw) as SavedRecord[];
+    } catch (e) {
+      console.warn('Failed to parse records from storage', e);
+      return [];
     }
   },
 
   async saveDiagnosis(userEmail: string, record: SavedRecord): Promise<void> {
-    try {
-      const records = this.getRecordsLocal();
-      const filtered = records.filter(r => r.id !== record.id);
-      const updated = [record, ...filtered];
-      localStorage.setItem('alcortex_emr_vault', JSON.stringify(updated.slice(0, 200)));
-      window.dispatchEvent(new Event('storage'));
-    } catch (error) {
-      console.error("Failed to save record locally:", error);
+    await delay(200);
+    const records = await this.getRecords();
+
+    // Use a simple id/timestamp if missing
+    const id = (record as any).id ?? `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const timestamp = (record as any).createdAt ?? new Date().toISOString();
+
+    const storedRecord: SavedRecord = {
+      ...record,
+      ...(record as any).id ? {} : { id },
+      ...(record as any).createdAt ? {} : { createdAt: timestamp },
+      ...(record as any).owner ? {} : { owner: userEmail } as any,
+    } as SavedRecord;
+
+    const idx = records.findIndex(r => (r as any).id === id);
+    if (idx >= 0) {
+      records[idx] = { ...records[idx], ...storedRecord };
+    } else {
+      records.push(storedRecord);
     }
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
   },
 
-  async getRecords(): Promise<SavedRecord[]> {
-    return this.getRecordsLocal();
+  async deleteRecord(id: string): Promise<void> {
+    await delay(150);
+    const records = await this.getRecords();
+    const filtered = records.filter(r => (r as any).id !== id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
   },
 
-  getRecordsLocal(): SavedRecord[] {
-    try {
-      const data = localStorage.getItem('alcortex_emr_vault');
-      if (!data) return [];
-      const parsed = JSON.parse(data);
-      if (!Array.isArray(parsed)) return [];
-      return parsed.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    } catch (e) { 
-      return []; 
-    }
+  async getRecordById(id: string): Promise<SavedRecord | null> {
+    const records = await this.getRecords();
+    return records.find(r => (r as any).id === id) ?? null;
   }
 };

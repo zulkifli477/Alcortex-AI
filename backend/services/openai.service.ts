@@ -1,84 +1,60 @@
-
-import OpenAI from "openai";
-import { PatientData, DiagnosisOutput } from "../../types";
-
 export class OpenAIService {
-  private openai: OpenAI;
+  private apiKey: string | undefined;
 
-  constructor() {
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey ?? process.env.OPENAI_API_KEY;
+    if (!this.apiKey) {
+      console.warn("OPENAI_API_KEY not set; OpenAI calls will return a mock result.");
+    }
   }
 
-  async analyzePatient(patient: PatientData, language: string, imageUri?: string): Promise<DiagnosisOutput> {
-    const labs = `
-      - BLOOD LAB: ${JSON.stringify(patient.labBlood)}
-      - URINE LAB: ${JSON.stringify(patient.labUrine)}
-      - SPUTUM LAB: ${JSON.stringify(patient.labSputum)}
-    `;
-
-    const vitals = `
-      BP: ${patient.vitals.bpSystolic}/${patient.vitals.bpDiastolic}, 
-      HR: ${patient.vitals.heartRate}, 
-      Temp: ${patient.vitals.temperature}, 
-      SpO2: ${patient.vitals.spo2}
-    `;
-
-    const systemPrompt = `
-      You are Alcortex AI, a world-class clinical diagnostic system. 
-      Analyze the medical data and return a structured diagnostic report.
-      Response language: ${language}.
-      Output format: JSON only.
-    `;
-
-    const userPrompt = `
-      Analyze this patient data:
-      - NAME: ${patient.name} (${patient.age}y, ${patient.gender})
-      - COMPLAINTS: ${patient.complaints}
-      - HISTORY: ${patient.history}
-      - VITALS: ${vitals}
-      - LABS: ${labs}
-      
-      Requirements:
-      1. mainDiagnosis (Specific)
-      2. differentials (Array of {diagnosis, icd10, confidence})
-      3. severity (Mild, Moderate, Severe, Critical)
-      4. confidenceScore (0 to 1)
-      5. interpretation (Detailed clinical analysis)
-      6. safetyWarning (Urgent warnings)
-      7. followUp (Management plan)
-      8. medicationRecs (Therapeutics)
-    `;
-
-    try {
-      const messages: any[] = [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ];
-
-      // Support for Multi-modal (GPT-4o Vision)
-      if (imageUri) {
-        messages[1].content = [
-          { type: "text", text: userPrompt },
-          { type: "image_url", image_url: { url: imageUri } }
-        ];
-      }
-
-      const response = await this.openai.chat.completions.create({
-        model: "gpt-4o",
-        messages,
-        response_format: { type: "json_object" },
-        temperature: 0.3,
-      });
-
-      const content = response.choices[0].message.content;
-      if (!content) throw new Error("Empty response from OpenAI");
-
-      return JSON.parse(content) as DiagnosisOutput;
-    } catch (error: any) {
-      console.error("OpenAI Service Error:", error);
-      throw new Error(`AI synthesis failed: ${error.message}`);
+  async analyzePatient(patient: any, language?: string, imageUri?: string) {
+    if (!patient || typeof patient !== "object") {
+      throw new Error("Invalid patient data");
     }
+
+    // Return mock response if no API key is configured (useful for local dev / tests)
+    if (!this.apiKey) {
+      return {
+        summary: "Mock analysis (OPENAI_API_KEY not set)",
+        patientId: (patient as any).id ?? null,
+        recommendations: [],
+        notes: "Set OPENAI_API_KEY to enable real analysis",
+      };
+    }
+
+    const systemPrompt = `You are a clinical assistant. Provide a concise, non-judgmental analysis and suggested next steps. Use ${language ?? "English"}.`;
+    const userContent = `Patient data:\n${JSON.stringify(patient, null, 2)}${imageUri ? `\nImage URI: ${imageUri}` : ""}`;
+
+    const payload = {
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+      max_tokens: 800,
+      temperature: 0.2,
+    };
+
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`OpenAI API error: ${res.status} ${text}`);
+    }
+
+    const json = await res.json();
+    const content = json.choices?.[0]?.message?.content ?? json.choices?.[0]?.text ?? "";
+
+    return {
+      summary: content,
+    };
   }
 }

@@ -3,13 +3,13 @@ import express from 'express';
 import mysql from 'mysql2';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { GeminiService } from './services/gemini.service';
+import { OpenAIService } from './services/openai.service';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const aiService = new GeminiService();
+const aiService = new OpenAIService();
 
 // Middleware
 // Fix: Use 'as any' casting to resolve type mismatch error between cors middleware return type and express app.use expectation.

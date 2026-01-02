@@ -15,3 +15,11 @@ export const analyzePatient = async (req: any, res: any) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+export const healthCheck = (req: any, res: any) => {
+  res.json({
+    status: 'OK',
+    engine: 'Alcortex AI v1 Active',
+    timestamp: new Date().toISOString()
+  });
+}; 
